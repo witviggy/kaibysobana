@@ -233,19 +233,27 @@ const logActivity = async (action, entityType, entityId, details) => {
 };
 
 // --- Auth Routes ---
-app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+app.get('/auth/google', (req, res, next) => {
+  console.log('🔐 Starting Google OAuth...');
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
 
 app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/login?error=failed` }),
+  (req, res, next) => {
+    console.log('🔐 Google callback received');
+    passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/login?error=failed` })(req, res, next);
+  },
   (req, res) => {
+    console.log('✅ OAuth success, user:', req.user?.email);
+    console.log('✅ Session ID:', req.sessionID);
     // Successful authentication, redirect home.
     res.redirect(`${FRONTEND_URL}/`);
   }
 );
 
 app.get('/api/auth/me', (req, res) => {
+  console.log('🔍 Auth check - Session ID:', req.sessionID);
+  console.log('🔍 Auth check - isAuthenticated:', req.isAuthenticated());
   if (req.isAuthenticated()) {
     res.json(req.user);
   } else {
