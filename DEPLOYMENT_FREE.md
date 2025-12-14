@@ -1,79 +1,130 @@
 # Free Tier Deployment Guide (Split Stack)
 
-This guide helps you deploy StitchFlow for free using **Vercel** (Frontend), **Render** (Backend), and **Supabase** (Database).
+Deploy StitchFlow for **$0/month** using Vercel, Render, and Supabase.
 
-## 1. Database (Supabase)
+## Architecture
 
-1.  Go to [Supabase.com](https://supabase.com/) and create a free account.
-2.  Create a **New Project**.
-    *   **Region**: Choose one close to you (e.g., Singapore/Mumbai).
-    *   **Database Password**: **Save this!** You'll need it later.
-3.  Once created, go to **Settings (Gear Icon) -> Database**.
-4.  Copy the **Connection String (Nodejs)**. It looks like:
-    `postgresql://postgres:[YOUR-PASSWORD]@db.xxx.supabase.co:5432/postgres`
-    *   *Tip: Replace `[YOUR-PASSWORD]` with the password you created.*
+| Service | Provider | Free Tier |
+|---------|----------|-----------|
+| Frontend | Vercel | Unlimited |
+| Backend | Render | 750 hrs/month |
+| Database | Supabase | 500MB PostgreSQL |
+| **Images** | Supabase Storage | 1GB |
 
-### Run Initial SQL
-Since we aren't using Docker to init the DB, you need to run the SQL query manually.
-1.  In Supabase, go to **SQL Editor**.
-2.  Copy the content from your local file `backend/db/init.sql`.
-3.  Paste it into the editor and click **Run**.
-    *   *This creates all your tables (clients, orders, etc.).*
+> [!WARNING]
+> **Render Free Tier**: Server spins down after 15min idle. First request after sleep takes ~30-60 seconds.
+
+---
+
+## 1. Database & Storage (Supabase)
+
+1.  Go to [Supabase.com](https://supabase.com/) → Create free account → **New Project**
+    - **Region**: Choose closest (e.g., Singapore/Mumbai)
+    - **Database Password**: **Save this!**
+
+2.  **Get Database Connection String**:
+    - Settings (⚙️) → Database → Connection String (Nodejs)
+    - Looks like: `postgresql://postgres:[YOUR-PASSWORD]@db.xxx.supabase.co:5432/postgres`
+
+3.  **Run Initial SQL**:
+    - SQL Editor → Paste contents of `backend/db/init.sql` → **Run**
+
+4.  **Create Storage Bucket**:
+    - Go to **Storage** (left sidebar)
+    - Click **New Bucket** → Name: `images`
+    - ✅ Check **Public bucket** → Create
+
+5.  **Get Storage Keys**:
+    - Settings (⚙️) → **API**
+    - Copy: **Project URL** (e.g., `https://xxx.supabase.co`)
+    - Copy: **service_role key** (NOT anon key!)
 
 ---
 
 ## 2. Backend (Render)
 
-1.  Push your code to **GitHub**.
-2.  Go to [Render.com](https://render.com/) and create a free account.
-3.  Click **New + -> Web Service**.
-4.  Connect your GitHub repository.
-5.  **Configuration**:
-    *   **Name**: `stitchflow-backend` (or similar)
-    *   **Root Directory**: `backend` (Important!)
-    *   **Environment**: Node
-    *   **Build Command**: `npm install`
-    *   **Start Command**: `node server.js`
-    *   **Instance Type**: Free
-6.  **Environment Variables** (Add these):
-    *   `DATABASE_URL`: (Paste the Supabase connection string from Step 1)
-    *   `GOOGLE_CLIENT_ID`: (Your Google Client ID)
-    *   `GOOGLE_CLIENT_SECRET`: (Your Google Client Secret)
-    *   `SESSION_SECRET`: (Random string)
-    *   `NODE_ENV`: `production`
-7.  Click **Create Web Service**.
-8.  **Wait**: It will deploy and give you a URL (e.g., `https://stitchflow-backend.onrender.com`). **Copy this URL.**
+1.  Push code to **GitHub**
+2.  Go to [Render.com](https://render.com/) → New + → **Web Service**
+3.  Connect your GitHub repository
+
+4.  **Configuration**:
+    - **Name**: `stitchflow-backend`
+    - **Root Directory**: `backend`
+    - **Environment**: Node
+    - **Build Command**: `npm install`
+    - **Start Command**: `node server.js`
+    - **Instance Type**: Free
+
+5.  **Environment Variables** (Add all):
+
+    | Variable | Value |
+    |----------|-------|
+    | `DATABASE_URL` | Supabase connection string from Step 1 |
+    | `SUPABASE_URL` | Supabase Project URL (e.g., `https://xxx.supabase.co`) |
+    | `SUPABASE_SERVICE_KEY` | Supabase service_role key |
+    | `GOOGLE_CLIENT_ID` | Your Google OAuth Client ID |
+    | `GOOGLE_CLIENT_SECRET` | Your Google OAuth Secret |
+    | `SESSION_SECRET` | Random string (e.g., `my-super-secret-key-12345`) |
+    | `NODE_ENV` | `production` |
+    | `BACKEND_URL` | `https://your-app.onrender.com` (fill after deploy) |
+    | `FRONTEND_URL` | `https://your-app.vercel.app` (fill after Vercel deploy) |
+
+6.  Click **Create Web Service** → Wait for deploy → Copy your Render URL
+
+> [!NOTE]
+> You'll need to update `BACKEND_URL` and `FRONTEND_URL` after both deploys are complete.
 
 ---
 
 ## 3. Frontend (Vercel)
 
-1.  Go to [Vercel.com](https://vercel.com/) and create a free account.
-2.  Click **Add New... -> Project**.
-3.  Import the same GitHub repository.
-4.  **Configuration**:
-    *   **Framework Preset**: Vite
-    *   **Root Directory**: Click "Edit" and select `frontend`.
-5.  **Environment Variables**:
-    *   `VITE_API_URL`: `https://stitchflow-backend.onrender.com/api`
-        *   *Note: Use the Render URL you copied, and append `/api` at the end.*
-6.  Click **Deploy**.
+1.  Go to [Vercel.com](https://vercel.com/) → Add New → **Project**
+2.  Import your GitHub repository
 
-## 4. Final Google Auth Update
+3.  **Configuration**:
+    - **Framework Preset**: Vite
+    - **Root Directory**: `frontend`
 
-Now that you have real URLs, you need to update Google Cloud Console.
+4.  **Environment Variables**:
 
-1.  Go to Google Cloud Console -> APIs & Services -> Credentials.
-2.  Edit your OAuth Client.
-3.  **Authorized JavaScript Origins**:
-    *   Add your Vercel URL (e.g., `https://stitchflow-frontend.vercel.app`)
-4.  **Authorized Redirect URIs**:
-    *   Add your Render Backend URL + callback (e.g., `https://stitchflow-backend.onrender.com/auth/google/callback`)
+    | Variable | Value |
+    |----------|-------|
+    | `VITE_API_URL` | `https://your-app.onrender.com` (Render URL from Step 2) |
+
+5.  Click **Deploy** → Copy your Vercel URL
 
 ---
 
-## Testing
+## 4. Final Setup
 
-1.  Open your Vercel URL.
-2.  Try to Log In.
-3.  It should redirect to Google -> Render -> Vercel (Logged In).
+### Update Render Environment Variables
+Go back to Render Dashboard → Your Service → Environment:
+- Set `BACKEND_URL` = your Render URL (e.g., `https://stitchflow-backend.onrender.com`)
+- Set `FRONTEND_URL` = your Vercel URL (e.g., `https://stitchflow.vercel.app`)
+- Click **Save Changes** → Render will auto-redeploy
+
+### Update Google Cloud Console
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
+2. Edit your OAuth Client:
+   - **Authorized JavaScript Origins**: Add your Vercel URL
+   - **Authorized Redirect URIs**: Add `https://your-render-url.onrender.com/auth/google/callback`
+
+---
+
+## 5. Test
+
+1. Open your Vercel URL
+2. Click **Login with Google**
+3. You should be redirected: Google → Render → Vercel (logged in!)
+4. Try uploading a fabric image → Should work (stored in Supabase)
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Login redirects fail | Check `BACKEND_URL` and `FRONTEND_URL` match your actual URLs |
+| Image upload fails | Verify `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are set. Check bucket is named `images` and is public |
+| Database errors | Run `backend/db/init.sql` in Supabase SQL Editor |
+| CORS errors | Ensure `FRONTEND_URL` matches your Vercel URL exactly |

@@ -14,11 +14,27 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
+const { createClient } = require('@supabase/supabase-js');
+
+// Supabase Client (for cloud storage)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+let supabase = null;
+
+if (supabaseUrl && supabaseServiceKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceKey);
+  console.log('✅ Supabase Storage initialized');
+} else {
+  console.warn('⚠️  SUPABASE_URL or SUPABASE_SERVICE_KEY missing. Image uploads will fail in production.');
+}
+
+// Multer Memory Storage (for cloud upload)
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
 // Session Config
@@ -26,35 +42,15 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'stitchflow_secret_key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set to true if using HTTPS
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  }
 }));
 
 // Passport Config
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer Storage Config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // Unique filename: timestamp + random + extension
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage: storage });
 
 // Database Connection
 // Database Connection
@@ -91,6 +87,8 @@ passport.deserializeUser(async (id, done) => {
 // Google Strategy
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "placeholder_id";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "placeholder_secret";
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 if (!process.env.GOOGLE_CLIENT_ID) {
   console.warn("⚠️  WARNING: GOOGLE_CLIENT_ID is missing using placeholder to prevent crash.");
@@ -99,7 +97,7 @@ if (!process.env.GOOGLE_CLIENT_ID) {
 passport.use(new GoogleStrategy({
   clientID: GOOGLE_CLIENT_ID,
   clientSecret: GOOGLE_CLIENT_SECRET,
-  callbackURL: "http://localhost:5000/auth/google/callback"
+  callbackURL: `${BACKEND_URL}/auth/google/callback`
 }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Check if user exists
@@ -237,10 +235,10 @@ app.get('/auth/google',
 );
 
 app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: 'http://localhost:3000/login?error=failed' }),
+  passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/login?error=failed` }),
   (req, res) => {
     // Successful authentication, redirect home.
-    res.redirect('http://localhost:3000/');
+    res.redirect(`${FRONTEND_URL}/`);
   }
 );
 
@@ -261,14 +259,40 @@ app.post('/api/auth/logout', (req, res) => {
 
 // --- Routes ---
 
-// 0. File Upload Endpoint
-app.post('/api/upload', upload.single('image'), (req, res) => {
+// 0. File Upload Endpoint (Supabase Storage)
+app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
-    const fileUrl = `/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
+
+    if (!supabase) {
+      return res.status(500).json({ message: 'Storage not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.' });
+    }
+
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const fileName = uniqueSuffix + path.extname(req.file.originalname);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('images')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return res.status(500).json({ message: 'Upload to storage failed', error: error.message });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(fileName);
+
+    res.json({ url: urlData.publicUrl });
   } catch (err) {
     console.error(err);
     res.status(500).send('Upload failed');
@@ -1013,4 +1037,3 @@ app.listen(port, async () => {
   await migrateSchema();
   console.log(`Server running on port ${port}`);
 });
-```
