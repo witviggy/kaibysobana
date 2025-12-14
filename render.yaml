@@ -1,60 +1,33 @@
-# Render Blueprint - StitchFlow
-# Deploy with: Render Dashboard → New → Blueprint → Connect Repo
-
+# Exported from Render on 2025-12-14T22:04:53Z
+version: "1"
 services:
-  # Backend API
-  - type: web
-    name: stitchflow-backend
-    runtime: node
-    region: singapore  # Change to your preferred region
-    plan: free
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: node server.js
-    healthCheckPath: /api/dashboard/stats
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: stitchflow-db
-          property: connectionString
-      - key: GOOGLE_CLIENT_ID
-        sync: false  # You'll set this manually
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: SUPABASE_URL
-        sync: false  # Set after creating Supabase project
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: BACKEND_URL
-        sync: false  # Set to your Render backend URL after deploy
-      - key: FRONTEND_URL
-        sync: false  # Set to your Render static site URL after deploy
-
-  # Frontend Static Site
-  - type: web
-    name: stitchflow-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: no-cache
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        sync: false  # Set to your Render backend URL after deploy
-
-databases:
-  # PostgreSQL Database (FREE FOR 90 DAYS ONLY)
-  - name: stitchflow-db
-    plan: free
-    region: singapore
+- type: web
+  name: stitchflow-backend
+  runtime: node
+  repo: https://github.com/witviggy/kaibysobana
+  plan: free
+  envVars:
+  - key: FRONTEND_URL
+    sync: false
+  - key: BACKEND_URL
+    sync: false
+  - key: SUPABASE_SERVICE_KEY
+    sync: false
+  - key: SUPABASE_URL
+    sync: false
+  - key: GOOGLE_CLIENT_SECRET
+    sync: false
+  - key: GOOGLE_CLIENT_ID
+    sync: false
+  - key: SESSION_SECRET
+    sync: false
+  - key: DATABASE_URL
+    sync: false
+  - key: NODE_ENV
+    sync: false
+  region: singapore
+  buildCommand: npm install
+  startCommand: node server.js
+  healthCheckPath: /api/dashboard/stats
+  autoDeployTrigger: commit
+  rootDir: backend
