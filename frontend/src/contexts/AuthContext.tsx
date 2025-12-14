@@ -39,8 +39,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = () => {
         // Redirect to Backend Google Auth Endpoint
+        // Auth routes are at /auth/google, not /api/auth/google
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        window.location.href = `${apiUrl}/auth/google`;
+        const baseUrl = apiUrl.replace(/\/api$/, ''); // Remove /api suffix if present
+        window.location.href = `${baseUrl}/auth/google`;
     };
 
     const logout = async () => {
