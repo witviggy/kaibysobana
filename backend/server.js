@@ -9,6 +9,7 @@ require('dotenv').config();
 const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -243,6 +244,8 @@ const logActivity = async (action, entityType, entityId, details) => {
 };
 
 // --- Auth Routes ---
+const JWT_SECRET = process.env.SESSION_SECRET || 'stitchflow_secret_key';
+
 app.get('/auth/google', (req, res, next) => {
   console.log('🔐 Starting Google OAuth...');
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
@@ -255,15 +258,61 @@ app.get('/auth/google/callback',
   },
   (req, res) => {
     console.log('✅ OAuth success, user:', req.user?.email);
-    console.log('✅ Session ID:', req.sessionID);
-    // Successful authentication, redirect home.
-    res.redirect(`${FRONTEND_URL}/`);
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: req.user.id,
+        email: req.user.email,
+        name: req.user.name,
+        avatar_url: req.user.avatar_url
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log('🔑 JWT token generated');
+
+    // Redirect to frontend with token in URL
+    res.redirect(`${FRONTEND_URL}/auth/callback?token=${token}`);
   }
 );
 
+// JWT verification middleware
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
 app.get('/api/auth/me', (req, res) => {
-  console.log('🔍 Auth check - Session ID:', req.sessionID);
-  console.log('🔍 Auth check - isAuthenticated:', req.isAuthenticated());
+  // Try JWT first
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      console.log('🔍 JWT auth success for:', decoded.email);
+      return res.json(decoded);
+    } catch (err) {
+      console.log('🔍 JWT auth failed:', err.message);
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+  }
+
+  // Fallback to session (for backwards compatibility)
   if (req.isAuthenticated()) {
     res.json(req.user);
   } else {

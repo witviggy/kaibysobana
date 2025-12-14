@@ -7,6 +7,15 @@ import { Client, Fabric, Order, Notification } from '../types';
 const BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
 
+// Get auth token from localStorage
+const getAuthToken = () => localStorage.getItem('auth_token');
+
+// Get auth headers with JWT token
+const getAuthHeaders = (): HeadersInit => {
+  const token = getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
 // Helper to handle responses
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -214,19 +223,26 @@ export const api = {
 
   // --- Auth ---
   getCurrentUser: async () => {
+    const token = getAuthToken();
+    if (!token) throw new Error("Not authenticated");
+
     const res = await fetch(`${API_URL}/auth/me`, {
-      headers: { 'Accept': 'application/json' },
-      credentials: 'include' // Important: Send session cookie
+      headers: {
+        'Accept': 'application/json',
+        ...getAuthHeaders()
+      }
     });
-    if (res.status === 401) throw new Error("Not authenticated");
+    if (res.status === 401) {
+      // Token invalid, remove it
+      localStorage.removeItem('auth_token');
+      throw new Error("Not authenticated");
+    }
     return handleResponse(res);
   },
   logout: async () => {
-    const res = await fetch(`${API_URL}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include'
-    });
-    return handleResponse(res);
+    // Remove token from localStorage
+    localStorage.removeItem('auth_token');
+    return { success: true };
   },
 
   // --- Catalog (Dress Types) ---
