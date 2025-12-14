@@ -2,10 +2,10 @@
 import { Client, Fabric, Order, Notification } from '../types';
 
 // Base URL for your Express Backend
-// In local development, this is usually http://localhost:5000
-// Base URL for your Express Backend
-// VITE_API_URL is set in Vercel/Netlify environment variables
-const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000/api';
+// VITE_API_URL should be the backend base URL (without /api)
+// e.g., https://stitchflow-backend.onrender.com
+const BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
 
 // Helper to handle responses
 const handleResponse = async (response: Response) => {
@@ -156,11 +156,7 @@ export const api = {
     return handleResponse(res);
   },
 
-  // --- User Profile ---
-  getCurrentUser: async () => {
-    const res = await fetch(`${API_URL}/users/me`);
-    return handleResponse(res);
-  },
+  // --- User Profile (uses /api/users/me) ---
 
   updateCurrentUser: async (userData: { name: string; email: string; avatarUrl?: string }) => {
     const res = await fetch(`${API_URL}/users/me`, {
