@@ -90,6 +90,9 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "placeholder_se
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
+console.log('🔗 BACKEND_URL:', BACKEND_URL);
+console.log('🔗 FRONTEND_URL:', FRONTEND_URL);
+
 if (!process.env.GOOGLE_CLIENT_ID) {
   console.warn("⚠️  WARNING: GOOGLE_CLIENT_ID is missing using placeholder to prevent crash.");
 }
