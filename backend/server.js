@@ -34,17 +34,30 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // Middleware
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
+const isProduction = process.env.NODE_ENV === 'production';
+console.log('🌐 Production mode:', isProduction);
+
+// Trust proxy for Render (required for secure cookies behind reverse proxy)
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
 
-// Session Config
+// Session Config - Cross-origin compatible
 app.use(session({
   secret: process.env.SESSION_SECRET || 'stitchflow_secret_key',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    secure: isProduction,           // HTTPS only in production
+    httpOnly: true,                 // Prevent XSS
+    sameSite: isProduction ? 'none' : 'lax',  // Allow cross-origin in production
+    maxAge: 24 * 60 * 60 * 1000    // 24 hours
   }
 }));
 
@@ -53,9 +66,6 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Database Connection
-// Database Connection
-const isProduction = process.env.NODE_ENV === 'production';
-
 const poolConfig = process.env.DATABASE_URL
   ? {
     connectionString: process.env.DATABASE_URL,
