@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment Variables (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env
+
+# Build Output
+dist/
+build/
+backend/public/
+!backend/public/index.html 
+# (Note: we might want to ignore backend/public if it's purely for the build, but keep if there are static assets. 
+# In our monolith setup, backend/public is where frontend builds to, so we likely want to ignore it 
+# so we don't commit build artifacts. I'll ignore everything in backend/public except if there's a specific gitkeep)
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+coverage/
+
+# Docker
+docker-compose.override.yml
