@@ -24,22 +24,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        console.log('🔄 AuthContext: Initial checkAuth');
         checkAuth();
     }, []);
 
     const checkAuth = async () => {
         // Check if token exists in localStorage
         const token = localStorage.getItem('auth_token');
+        console.log('🔍 AuthContext: Token in localStorage:', token ? 'EXISTS' : 'NOT FOUND');
+
         if (!token) {
+            console.log('❌ AuthContext: No token, setting user to null');
             setUser(null);
             setLoading(false);
             return;
         }
 
         try {
+            console.log('📡 AuthContext: Calling getCurrentUser API...');
             const userData = await api.getCurrentUser();
+            console.log('✅ AuthContext: User data received:', userData?.email);
             setUser(userData);
         } catch (err) {
+            console.error('❌ AuthContext: getCurrentUser error:', err);
             setUser(null);
         } finally {
             setLoading(false);
@@ -47,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const refreshUser = async () => {
+        console.log('🔄 AuthContext: refreshUser called');
         setLoading(true);
         await checkAuth();
     };
