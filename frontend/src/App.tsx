@@ -5,7 +5,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import Login from './pages/Login';
-import AuthCallback from './pages/AuthCallback';
 
 const App: React.FC = () => {
     return (
@@ -13,7 +12,6 @@ const App: React.FC = () => {
             <AuthProvider>
                 <Routes>
                     <Route path="/login" element={<Login />} />
-                    <Route path="/auth/callback" element={<AuthCallback />} />
 
                     {/* Protected Routes Wrapper */}
                     <Route element={<ProtectedRoute />}>

@@ -173,57 +173,56 @@ const Financials: React.FC = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-2 bg-zinc-100 rounded text-zinc-600">
-                            <IndianRupee size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
+                            <IndianRupee size={18} />
                         </div>
                         <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                             <ArrowUpRight size={12} /> 12.5%
                         </div>
                     </div>
                     <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Revenue</p>
-                    <h3 className="text-2xl font-semibold text-zinc-900 mt-1">₹{totalRevenue.toLocaleString()}</h3>
+                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">₹{totalRevenue.toLocaleString()}</h3>
                 </div>
 
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-2 bg-zinc-100 rounded text-zinc-600">
-                            <TrendingUp size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
+                            <TrendingUp size={18} />
                         </div>
                         <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                             <ArrowUpRight size={12} /> 8.2%
                         </div>
                     </div>
                     <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Net Profit</p>
-                    <h3 className="text-2xl font-semibold text-zinc-900 mt-1">₹{totalProfit.toLocaleString()}</h3>
+                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">₹{totalProfit.toLocaleString()}</h3>
                 </div>
 
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-2 bg-zinc-100 rounded text-zinc-600">
-                            <TrendingDown size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
+                            <TrendingDown size={18} />
                         </div>
-                        {/* Expenses increasing: Bad (Red) */}
                         <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
                             <ArrowUpRight size={12} /> 2.4%
                         </div>
                     </div>
                     <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Expenses</p>
-                    <h3 className="text-2xl font-semibold text-zinc-900 mt-1">₹{totalCost.toLocaleString()}</h3>
+                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">₹{totalCost.toLocaleString()}</h3>
                 </div>
 
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-2 bg-zinc-100 rounded text-zinc-600">
-                            <Activity size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
+                            <Activity size={18} />
                         </div>
                         <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                             <ArrowUpRight size={12} /> 1.2%
                         </div>
                     </div>
                     <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Profit Margin</p>
-                    <h3 className="text-2xl font-semibold text-zinc-900 mt-1">{avgMargin.toFixed(1)}%</h3>
+                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">{avgMargin.toFixed(1)}%</h3>
                 </div>
             </div>
 

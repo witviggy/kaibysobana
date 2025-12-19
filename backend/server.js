@@ -243,42 +243,9 @@ const logActivity = async (action, entityType, entityId, details) => {
   }
 };
 
-// --- Auth Routes ---
-const JWT_SECRET = process.env.SESSION_SECRET || 'stitchflow_secret_key';
+// --- Auth Routes (Keycloak handles authentication) ---
 
-app.get('/auth/google', (req, res, next) => {
-  console.log('🔐 Starting Google OAuth...');
-  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
-});
-
-app.get('/auth/google/callback',
-  (req, res, next) => {
-    console.log('🔐 Google callback received');
-    passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/login?error=failed` })(req, res, next);
-  },
-  (req, res) => {
-    console.log('✅ OAuth success, user:', req.user?.email);
-
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: req.user.id,
-        email: req.user.email,
-        name: req.user.name,
-        avatar_url: req.user.avatar_url
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    console.log('🔑 JWT token generated');
-
-    // Redirect to frontend with token in URL
-    res.redirect(`${FRONTEND_URL}/auth/callback?token=${token}`);
-  }
-);
-
-// JWT verification middleware
+// JWT/Keycloak token verification middleware
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -288,7 +255,10 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = decodeKeycloakToken(token);
+    if (!decoded || !decoded.email) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
     req.user = decoded;
     next();
   } catch (err) {
@@ -296,27 +266,92 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-app.get('/api/auth/me', (req, res) => {
-  // Try JWT first
+// Keycloak configuration
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://localhost:8080';
+const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM || 'kai';
+
+// Helper to decode JWT (Keycloak tokens are JWTs)
+const decodeKeycloakToken = (token) => {
+  try {
+    // In development, we just decode the token without full verification
+    // In production, you should verify against Keycloak's public key
+    const parts = token.split('.');
+    if (parts.length !== 3) throw new Error('Invalid token format');
+
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    return payload;
+  } catch (err) {
+    console.error('Token decode error:', err.message);
+    return null;
+  }
+};
+
+// Find or create user from Keycloak token
+const findOrCreateUserFromKeycloak = async (tokenPayload) => {
+  const keycloakId = tokenPayload.sub;
+  const email = tokenPayload.email;
+  const name = tokenPayload.name || tokenPayload.preferred_username || email.split('@')[0];
+
+  // Try to find existing user by keycloak_id or email
+  let result = await pool.query(
+    'SELECT * FROM users WHERE keycloak_id = $1 OR email = $2',
+    [keycloakId, email]
+  );
+
+  if (result.rows.length > 0) {
+    const user = result.rows[0];
+    // Update keycloak_id if not set
+    if (!user.keycloak_id) {
+      await pool.query('UPDATE users SET keycloak_id = $1 WHERE id = $2', [keycloakId, user.id]);
+    }
+    return user;
+  }
+
+  // Create new user
+  result = await pool.query(
+    'INSERT INTO users (name, email, keycloak_id, preferences) VALUES ($1, $2, $3, $4) RETURNING *',
+    [name, email, keycloakId, '{}']
+  );
+  console.log('✅ Created new user from Keycloak:', email);
+  return result.rows[0];
+};
+
+app.get('/api/auth/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      console.log('🔍 JWT auth success for:', decoded.email);
-      return res.json(decoded);
-    } catch (err) {
-      console.log('🔍 JWT auth failed:', err.message);
-      return res.status(401).json({ message: 'Invalid token' });
-    }
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
   }
 
-  // Fallback to session (for backwards compatibility)
-  if (req.isAuthenticated()) {
-    res.json(req.user);
-  } else {
-    res.status(401).json({ message: 'Not authenticated' });
+  try {
+    // Decode Keycloak token
+    const decoded = decodeKeycloakToken(token);
+    if (!decoded || !decoded.email) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    console.log('🔐 Keycloak token for:', decoded.email);
+
+    // Find or create user
+    const user = await findOrCreateUserFromKeycloak(decoded);
+
+    // Fetch fresh user data
+    const result = await pool.query(
+      `SELECT id, name, email, nickname, avatar_url as "avatarUrl", preferences, role 
+       FROM users WHERE id = $1`,
+      [user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log('✅ Auth success for:', result.rows[0].email);
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('❌ Auth error:', err.message);
+    return res.status(401).json({ message: 'Authentication failed' });
   }
 });
 
@@ -327,45 +362,112 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+// Update current user profile (requires Keycloak token)
+app.put('/api/users/me', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+
+  try {
+    // Decode Keycloak token
+    const decoded = decodeKeycloakToken(token);
+    if (!decoded || !decoded.email) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    // Find or create user from Keycloak
+    const user = await findOrCreateUserFromKeycloak(decoded);
+    const userId = user.id;
+
+    const { name, email, nickname, avatarUrl, preferences } = req.body;
+
+    console.log('📝 Updating user:', userId, { name, nickname, avatarUrl: avatarUrl ? 'set' : 'not set' });
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET name = COALESCE($1, name), 
+           email = COALESCE($2, email), 
+           nickname = $3, 
+           avatar_url = $4,
+           preferences = COALESCE($5::jsonb, preferences)
+       WHERE id = $6 
+       RETURNING id, name, email, nickname, avatar_url as "avatarUrl", preferences, role`,
+      [name, email, nickname || null, avatarUrl || null, preferences ? JSON.stringify(preferences) : null, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log('✅ User profile updated:', result.rows[0].email);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('❌ Error updating user:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // --- Routes ---
 
-// 0. File Upload Endpoint (Supabase Storage)
+// 0. File Upload Endpoint (Supabase Storage or Local Fallback)
+const fs = require('fs');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    if (!supabase) {
-      return res.status(500).json({ message: 'Storage not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.' });
-    }
-
     // Generate unique filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const fileName = uniqueSuffix + path.extname(req.file.originalname);
 
-    // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('images')
-      .upload(fileName, req.file.buffer, {
-        contentType: req.file.mimetype,
-        upsert: false
-      });
+    // Try Supabase first, fallback to local storage
+    if (supabase) {
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: false
+        });
 
-    if (error) {
-      console.error('Supabase upload error:', error);
-      return res.status(500).json({ message: 'Upload to storage failed', error: error.message });
+      if (error) {
+        console.error('Supabase upload error:', error);
+        return res.status(500).json({ message: 'Upload to storage failed', error: error.message });
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName);
+
+      return res.json({ url: urlData.publicUrl });
+    } else {
+      // Local file storage fallback
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      fs.writeFileSync(filePath, req.file.buffer);
+
+      // Return URL relative to backend
+      const publicUrl = `${BACKEND_URL}/uploads/${fileName}`;
+      console.log('📁 File saved locally:', publicUrl);
+      return res.json({ url: publicUrl });
     }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('images')
-      .getPublicUrl(fileName);
-
-    res.json({ url: urlData.publicUrl });
   } catch (err) {
     console.error(err);
-    res.status(500).send('Upload failed');
+    res.status(500).json({ message: 'Upload failed', error: err.message });
   }
 });
 

@@ -1,8 +1,12 @@
+-- Create Keycloak database (for Keycloak auth service)
+CREATE DATABASE keycloak;
+
 -- Create Users Table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
+    keycloak_id VARCHAR(255),
     nickname VARCHAR(255),
     role VARCHAR(50) DEFAULT 'Admin',
     avatar_url TEXT,
@@ -82,6 +86,8 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- Users
 INSERT INTO users (id, name, email, avatar_url) VALUES 
 (1, 'Olivia Rhye', 'olivia@stitchflow.com', 'https://picsum.photos/id/64/100/100');
+
+SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 -- Clients
 INSERT INTO clients (id, name, email, phone, address, status, member_since, last_order_date, avatar_url) VALUES 

@@ -129,10 +129,12 @@ export const Layout: React.FC = () => {
             `}>
                 <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center text-white">
-                            <Scissors size={16} />
-                        </div>
-                        <span className="text-base font-bold tracking-tight text-zinc-900">Kai By Sobana</span>
+                        <img
+                            src="/src/logo/kailogov1.png"
+                            alt="கை(kai)"
+                            className="w-8 h-8 rounded-lg object-contain"
+                        />
+                        <span className="text-base font-bold tracking-tight text-zinc-900">கை(kai)</span>
                     </div>
                     <button onClick={toggleSidebar} className="ml-auto lg:hidden text-zinc-400 hover:text-zinc-600 p-2">
                         <X size={20} />
@@ -161,8 +163,8 @@ export const Layout: React.FC = () => {
                         className="w-full flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-lg transition-colors text-left"
                     >
                         <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 overflow-hidden border border-zinc-200">
-                            {user?.avatar_url ? (
-                                <img src={user.avatar_url} alt="User" className="w-full h-full object-cover" />
+                            {(user?.avatarUrl || user?.avatar_url) ? (
+                                <img src={user.avatarUrl || user.avatar_url} alt="User" className="w-full h-full object-cover" />
                             ) : (
                                 <User size={16} />
                             )}
@@ -233,8 +235,8 @@ export const Layout: React.FC = () => {
                                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                                 className="w-8 h-8 rounded-full bg-zinc-200 overflow-hidden hover:ring-2 hover:ring-zinc-200 transition-all ml-2"
                             >
-                                {user?.avatar_url ? (
-                                    <img src={user.avatar_url} alt="User" className="w-full h-full object-cover" />
+                                {(user?.avatarUrl || user?.avatar_url) ? (
+                                    <img src={user.avatarUrl || user.avatar_url} alt="User" className="w-full h-full object-cover" />
                                 ) : (
                                     <User size={16} className="text-zinc-500 m-auto h-full" />
                                 )}

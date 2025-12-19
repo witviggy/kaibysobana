@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev", "--", "--host"]
+ENTRYPOINT ["npm", "run", "dev", "--", "--host"]

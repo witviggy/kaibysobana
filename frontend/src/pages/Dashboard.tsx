@@ -20,27 +20,28 @@ import { OrderStatus } from '../types';
 import { api } from '../services/api';
 import { SkeletonCard, SkeletonLine } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const KpiCard = ({ title, value, trend, trendValue, icon: Icon, delay }: any) => {
   const isPositive = trend === 'up';
 
   return (
     <div
-      className="bg-white p-6 rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors shadow-sm"
+      className="bg-white p-4 rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors shadow-sm"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 rounded-md bg-zinc-100 text-zinc-900">
-          <Icon size={20} />
+      <div className="flex justify-between items-start mb-3">
+        <div className="p-1.5 rounded-md bg-zinc-100 text-zinc-900">
+          <Icon size={18} />
         </div>
-        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${title === 'Active Orders' && !isPositive ? 'bg-emerald-50 text-emerald-700' : isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-          {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${title === 'Active Orders' && !isPositive ? 'bg-emerald-50 text-emerald-700' : isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+          {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
           {trendValue}
         </div>
       </div>
       <div>
-        <h3 className="text-2xl font-semibold text-zinc-900 tracking-tight mb-1">{value}</h3>
-        <p className="text-sm text-zinc-500">{title}</p>
+        <h3 className="text-xl font-semibold text-zinc-900 tracking-tight mb-0.5">{value}</h3>
+        <p className="text-xs text-zinc-500">{title}</p>
       </div>
     </div>
   );
@@ -49,6 +50,7 @@ const KpiCard = ({ title, value, trend, trendValue, icon: Icon, delay }: any) =>
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { user: authUser } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('7d');
@@ -133,7 +135,7 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
-            Good morning, {stats?.user?.nickname || stats?.user?.name?.split(' ')[0]}!
+            {greeting}, {authUser?.nickname || authUser?.name?.split(' ')[0] || 'there'}!
           </h1>
           <p className="text-zinc-500 text-sm mt-1">Here's what's happening today.</p>
         </div>

@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import keycloak from '../keycloak';
 import { api } from '../services/api';
 
 interface User {
     id: number;
     name: string;
     email: string;
+    nickname?: string;
+    avatarUrl?: string;
     avatar_url?: string;
-    google_id?: string;
+    keycloak_id?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +18,7 @@ interface AuthContextType {
     login: () => void;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
+    keycloakToken: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,62 +26,112 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [keycloakToken, setKeycloakToken] = useState<string | null>(null);
+    const [keycloakInitialized, setKeycloakInitialized] = useState(false);
+    const initCalled = useRef(false); // Prevent double init in React Strict Mode
 
+    // Initialize Keycloak
     useEffect(() => {
-        console.log('🔄 AuthContext: Initial checkAuth');
-        checkAuth();
+        const initKeycloak = async () => {
+            // Prevent double initialization (React Strict Mode)
+            if (initCalled.current) return;
+            initCalled.current = true;
+
+            try {
+                console.log('🔐 Initializing Keycloak...');
+                const authenticated = await keycloak.init({
+                    onLoad: 'check-sso',
+                    silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+                    checkLoginIframe: false,
+                    pkceMethod: 'S256', // Enable PKCE
+                });
+
+                console.log('🔐 Keycloak initialized, authenticated:', authenticated);
+                setKeycloakInitialized(true);
+
+                if (authenticated && keycloak.token) {
+                    console.log('✅ User authenticated via Keycloak');
+                    setKeycloakToken(keycloak.token);
+                    localStorage.setItem('auth_token', keycloak.token);
+
+                    // Fetch user data from backend
+                    await fetchUserData();
+                } else {
+                    console.log('❌ User not authenticated');
+                    setUser(null);
+                    setLoading(false);
+                }
+
+                // Set up token refresh
+                keycloak.onTokenExpired = () => {
+                    console.log('🔄 Token expired, refreshing...');
+                    keycloak.updateToken(30).then((refreshed) => {
+                        if (refreshed && keycloak.token) {
+                            console.log('✅ Token refreshed');
+                            setKeycloakToken(keycloak.token);
+                            localStorage.setItem('auth_token', keycloak.token);
+                        }
+                    }).catch(() => {
+                        console.error('❌ Failed to refresh token');
+                        logout();
+                    });
+                };
+
+            } catch (error) {
+                console.error('❌ Keycloak init error:', error);
+                setLoading(false);
+            }
+        };
+
+        initKeycloak();
     }, []);
 
-    const checkAuth = async () => {
-        // Check if token exists in localStorage
-        const token = localStorage.getItem('auth_token');
-        console.log('🔍 AuthContext: Token in localStorage:', token ? 'EXISTS' : 'NOT FOUND');
-
-        if (!token) {
-            console.log('❌ AuthContext: No token, setting user to null');
-            setUser(null);
-            setLoading(false);
-            return;
-        }
-
+    const fetchUserData = async () => {
         try {
-            console.log('📡 AuthContext: Calling getCurrentUser API...');
+            console.log('📡 Fetching user data...');
             const userData = await api.getCurrentUser();
-            console.log('✅ AuthContext: User data received:', userData?.email);
+            console.log('✅ User data received:', userData?.email);
             setUser(userData);
         } catch (err) {
-            console.error('❌ AuthContext: getCurrentUser error:', err);
+            console.error('❌ Failed to fetch user data:', err);
             setUser(null);
         } finally {
             setLoading(false);
         }
     };
 
-    const refreshUser = async () => {
-        console.log('🔄 AuthContext: refreshUser called');
+    const refreshUser = useCallback(async () => {
+        console.log('🔄 Refreshing user...');
         setLoading(true);
-        await checkAuth();
-    };
+        await fetchUserData();
+    }, []);
 
-    const login = () => {
-        // Redirect to Backend Google Auth Endpoint
-        // Auth routes are at /auth/google, not /api/auth/google
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const baseUrl = apiUrl.replace(/\/api$/, ''); // Remove /api suffix if present
-        window.location.href = `${baseUrl}/auth/google`;
-    };
+    const login = useCallback(() => {
+        console.log('🔐 Redirecting to Keycloak login...');
+        keycloak.login({
+            redirectUri: window.location.origin + '/',
+        });
+    }, []);
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
+        console.log('🔐 Logging out...');
         try {
-            await api.logout();
+            localStorage.removeItem('auth_token');
             setUser(null);
+            setKeycloakToken(null);
+
+            if (keycloakInitialized) {
+                await keycloak.logout({
+                    redirectUri: window.location.origin + '/login',
+                });
+            }
         } catch (err) {
-            console.error(err);
+            console.error('❌ Logout error:', err);
         }
-    };
+    }, [keycloakInitialized]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, keycloakToken }}>
             {children}
         </AuthContext.Provider>
     );

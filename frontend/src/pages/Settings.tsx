@@ -3,10 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { User, Bell, Shield, Wallet, Save, RefreshCw, CheckCircle, Camera, Mail, Briefcase } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import { SkeletonLine, SkeletonCircle } from '../components/Skeleton';
 
 const Settings: React.FC = () => {
     const { addToast } = useToast();
+    const { refreshUser } = useAuth();
     const [user, setUser] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -73,6 +75,10 @@ const Settings: React.FC = () => {
             setSaveSuccess(false);
             const updated = await api.updateCurrentUser(formData);
             setUser(updated);
+
+            // Refresh the global auth context so header/layout sees updated avatar
+            await refreshUser();
+
             setSaveSuccess(true);
             addToast("Settings saved successfully", 'success');
             setTimeout(() => setSaveSuccess(false), 3000);

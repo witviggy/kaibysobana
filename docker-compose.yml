@@ -1,13 +1,13 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   postgres:
     image: postgres:15-alpine
     container_name: stitchflow_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: stitchflow
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-stitchflow}
     ports:
       - "5432:5432"
     volumes:
@@ -20,10 +20,30 @@ services:
     image: dpage/pgadmin4
     container_name: stitchflow_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
       - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - stitchflow-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: stitchflow_keycloak
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
+      - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
+    command: start-dev --import-realm
+    ports:
+      - "8080:8080"
     depends_on:
       - postgres
     networks:
@@ -35,16 +55,20 @@ services:
     env_file:
       - ./backend/.env
     ports:
-      - "5000:5000"
+      - "${PORT:-5000}:5000"
     environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=stitchflow
-      - DB_PORT=5432
-
-      - DB_PORT=5432
-      - PORT=5000
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - DB_NAME=${POSTGRES_DB:-stitchflow}
+      - DB_PORT=${DB_PORT:-5432}
+      - PORT=${PORT:-5000}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:5000}
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       - postgres
     networks:
@@ -53,8 +77,15 @@ services:
   frontend:
     build: ./frontend
     container_name: stitchflow_frontend
+    env_file:
+      - ./frontend/.env
     ports:
       - "3000:3000"
+    environment:
+      - VITE_API_URL=${BACKEND_URL:-http://localhost:5000}/api
+      - VITE_KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
+      - VITE_KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
+      - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-kai-frontend}
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -65,6 +96,7 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
 
 networks:
   stitchflow-network:

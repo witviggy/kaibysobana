@@ -169,7 +169,7 @@ const Calendar: React.FC = () => {
 
         // Empty cells for previous month
         for (let i = 0; i < startDay; i++) {
-            days.push(<div key={`empty-${i}`} className="h-24 sm:h-32 bg-zinc-50/30 border-b border-r border-zinc-100" />);
+            days.push(<div key={`empty-${i}`} className="min-h-[60px] bg-zinc-50/30 border-b border-r border-zinc-100" />);
         }
 
         // Days of current month
@@ -182,18 +182,18 @@ const Calendar: React.FC = () => {
                 <div
                     key={i}
                     onClick={() => handleDateClick(i)}
-                    className={`h-24 sm:h-32 border-b border-r border-zinc-100 p-2 transition-colors hover:bg-zinc-50 cursor-pointer relative group ${isToday ? 'bg-zinc-50' : 'bg-white'}`}
+                    className={`min-h-[60px] border-b border-r border-zinc-100 p-1.5 transition-colors hover:bg-zinc-50 cursor-pointer relative group flex flex-col ${isToday ? 'bg-zinc-50' : 'bg-white'}`}
                 >
                     <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-zinc-900 bg-zinc-200 w-6 h-6 rounded-full flex items-center justify-center' : 'text-zinc-500'}`}>
                         {i}
                     </div>
 
-                    <div className="space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">
+                    <div className="flex-1 space-y-0.5 overflow-hidden">
                         {dayEvents.map((evt, idx) => (
                             <div
                                 key={idx}
                                 onClick={(e) => handleEventClick(e, evt)}
-                                className={`text-[10px] px-1.5 py-1 rounded truncate border cursor-pointer hover:opacity-80
+                                className={`text-[9px] px-1 py-0.5 rounded truncate border cursor-pointer hover:opacity-80
                                     ${evt.type === 'delivery' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                                         evt.type === 'meeting' ? 'bg-purple-50 text-purple-700 border-purple-100' :
                                             evt.type === 'deadline' ? 'bg-red-50 text-red-700 border-red-100' :
@@ -216,7 +216,7 @@ const Calendar: React.FC = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto h-[calc(100vh-8rem)] flex flex-col">
+        <div className="max-w-7xl mx-auto h-full flex flex-col pb-4">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
@@ -255,7 +255,7 @@ const Calendar: React.FC = () => {
                     ))}
                 </div>
                 {/* Days */}
-                <div className="grid grid-cols-7 flex-1 overflow-y-auto">
+                <div className="grid grid-cols-7 grid-rows-6 flex-1">
                     {renderCalendarDays()}
                 </div>
             </div>

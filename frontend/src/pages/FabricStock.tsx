@@ -95,36 +95,36 @@ const FabricStock: React.FC = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
-                            <Package size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
+                            <Package size={18} />
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Materials</p>
-                            <p className="text-2xl font-semibold text-zinc-900">{fabrics.length}</p>
+                            <p className="text-xl font-semibold text-zinc-900">{fabrics.length}</p>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
-                            <AlertCircle size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
+                            <AlertCircle size={18} />
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Low Stock</p>
-                            <p className="text-2xl font-semibold text-zinc-900">{lowStockCount}</p>
+                            <p className="text-xl font-semibold text-zinc-900">{lowStockCount}</p>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
-                            <IndianRupee size={20} />
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
+                            <IndianRupee size={18} />
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Value</p>
-                            <p className="text-2xl font-semibold text-zinc-900">₹{totalValue.toLocaleString()}</p>
+                            <p className="text-xl font-semibold text-zinc-900">₹{totalValue.toLocaleString()}</p>
                         </div>
                     </div>
                 </div>

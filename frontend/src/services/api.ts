@@ -167,10 +167,13 @@ export const api = {
 
   // --- User Profile (uses /api/users/me) ---
 
-  updateCurrentUser: async (userData: { name: string; email: string; avatarUrl?: string }) => {
+  updateCurrentUser: async (userData: { name: string; email: string; avatarUrl?: string; nickname?: string; preferences?: any }) => {
     const res = await fetch(`${API_URL}/users/me`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
       body: JSON.stringify(userData),
     });
     return handleResponse(res);
