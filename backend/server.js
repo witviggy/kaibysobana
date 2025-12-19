@@ -44,7 +44,7 @@ if (isProduction) {
 }
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'https://kaibyshobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io',
   credentials: true
 }));
 app.use(express.json());
@@ -116,8 +116,8 @@ passport.deserializeUser(async (id, done) => {
 // Google Strategy
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "placeholder_id";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "placeholder_secret";
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5001';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://kaibyshobana-backend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://kaibyshobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io';
 
 console.log('🔗 BACKEND_URL:', BACKEND_URL);
 console.log('🔗 FRONTEND_URL:', FRONTEND_URL);
@@ -285,7 +285,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // Keycloak configuration
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://localhost:8080';
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'https://kaibyshobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io';
 const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM || 'kai';
 
 // Helper to decode JWT (Keycloak tokens are JWTs)
