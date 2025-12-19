@@ -1,42 +1,66 @@
-name: Build and Deploy to Azure
+name: Build and Deploy Containers
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to ACR
-        uses: azure/docker-login@v1
-        with:
-          login-server: stitchflowacr.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-
-      - name: Build and push backend
-        run: |
-          docker build ./backend -t stitchflowacr.azurecr.io/stitchflow-backend:${{ github.sha }}
-          docker push stitchflowacr.azurecr.io/stitchflow-backend:${{ github.sha }}
-
-      - name: Build and push frontend
-        run: |
-          docker build ./frontend -t stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
-          docker push stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
 
       - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to App Service
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: stitchflowacr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # ---------------- BACKEND ----------------
+      - name: Build & Push Backend
+        run: |
+          docker build ./backend \
+            -t stitchflowacr.azurecr.io/stitchflow-backend:latest
+          docker push stitchflowacr.azurecr.io/stitchflow-backend:latest
+
+      - name: Deploy Backend
         uses: azure/webapps-deploy@v2
         with:
-          app-name: stitchflow-app
-          slot-name: production
-          multi-container-config-type: compose
-          multi-container-config-file: docker-compose-azure.yml
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          app-name: kaibyshobana-backend
+          publish-profile: ${{ secrets.BACKEND_PUBLISH_PROFILE }}
+          images: stitchflowacr.azurecr.io/stitchflow-backend:latest
+
+      # ---------------- FRONTEND ----------------
+      - name: Build & Push Frontend
+        run: |
+          docker build ./frontend \
+            -t stitchflowacr.azurecr.io/stitchflow-frontend:latest
+          docker push stitchflowacr.azurecr.io/stitchflow-frontend:latest
+
+      - name: Deploy Frontend
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: kaibyshobana-frontend
+          publish-profile: ${{ secrets.FRONTEND_PUBLISH_PROFILE }}
+          images: stitchflowacr.azurecr.io/stitchflow-frontend:latest
+
+      # ---------------- KEYCLOAK ----------------
+      - name: Build & Push Keycloak
+        run: |
+          docker build ./keycloak \
+            -t stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+          docker push stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+
+      - name: Deploy Keycloak
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: kaibyshobana-keycloak
+          publish-profile: ${{ secrets.KEYCLOAK_PUBLISH_PROFILE }}
+          images: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
