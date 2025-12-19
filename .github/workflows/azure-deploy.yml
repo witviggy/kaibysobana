@@ -23,44 +23,26 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # ---------------- BACKEND ----------------
-      - name: Build & Push Backend
+          # ---------------- BACKEND ----------------
+      - name: Deploy Backend (Container App)
         run: |
-          docker build ./backend \
-            -t stitchflowacr.azurecr.io/stitchflow-backend:latest
-          docker push stitchflowacr.azurecr.io/stitchflow-backend:latest
-
-      - name: Deploy Backend
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: kaibyshobana-backend
-          publish-profile: ${{ secrets.BACKEND_PUBLISH_PROFILE }}
-          images: stitchflowacr.azurecr.io/stitchflow-backend:latest
+          az containerapp update \
+            --name kaibyshobana-backend \
+            --resource-group Deep_PerPro \
+            --image stitchflowacr.azurecr.io/stitchflow-backend:latest
 
       # ---------------- FRONTEND ----------------
-      - name: Build & Push Frontend
+      - name: Deploy Frontend (Container App)
         run: |
-          docker build ./frontend \
-            -t stitchflowacr.azurecr.io/stitchflow-frontend:latest
-          docker push stitchflowacr.azurecr.io/stitchflow-frontend:latest
-
-      - name: Deploy Frontend
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: kaibyshobana-frontend
-          publish-profile: ${{ secrets.FRONTEND_PUBLISH_PROFILE }}
-          images: stitchflowacr.azurecr.io/stitchflow-frontend:latest
+          az containerapp update \
+            --name kaibyshobana-frontend \
+            --resource-group Deep_PerPro \
+            --image stitchflowacr.azurecr.io/stitchflow-frontend:latest
 
       # ---------------- KEYCLOAK ----------------
-      - name: Build & Push Keycloak
+      - name: Deploy Keycloak (Container App)
         run: |
-          docker build ./keycloak \
-            -t stitchflowacr.azurecr.io/stitchflow-keycloak:latest
-          docker push stitchflowacr.azurecr.io/stitchflow-keycloak:latest
-
-      - name: Deploy Keycloak
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: kaibyshobana-keycloak
-          publish-profile: ${{ secrets.KEYCLOAK_PUBLISH_PROFILE }}
-          images: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+          az containerapp update \
+            --name kaibyshobana-keycloak \
+            --resource-group Deep_PerPro \
+            --image stitchflowacr.azurecr.io/stitchflow-keycloak:latest
