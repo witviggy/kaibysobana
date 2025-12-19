@@ -27,6 +27,11 @@ jobs:
           docker build ./frontend -t stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
           docker push stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
 
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Deploy to App Service
         uses: azure/webapps-deploy@v2
         with:
