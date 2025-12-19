@@ -12,7 +12,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 const path = require('path');
 const multer = require('multer');
@@ -67,20 +67,38 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Database Connection
-const poolConfig = process.env.DATABASE_URL
-  ? {
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } // Required for Supabase/Render/Neon
-  }
-  : {
-    user: process.env.DB_USER || 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_NAME || 'stitchflow',
-    password: process.env.DB_PASSWORD || 'password',
-    port: process.env.DB_PORT || 5432,
-  };
+// Database Connection (Azure Postgres requires SSL)
+// const poolConfig = process.env.DB_URL
+//   ? {
+//       connectionString: process.env.DB_URL,
+//       ssl: {
+//         require: true,
+//         rejectUnauthorized: false
+//       }
+//     }
+//   : {
+//       user: process.env.DB_USER,
+//       host: process.env.DB_HOST,
+//       database: process.env.DB_NAME,
+//       password:'fractoria%2DB',
+//       port: process.env.DB_PORT,
+//       ssl: {
+//         require: true,
+//         rejectUnauthorized: false
+//       }
+//     };
 
-const pool = new Pool(poolConfig);
+// const pool = new Pool(poolConfig);
+
+const pool = new Pool({
+  host: "fractoriadb-server.postgres.database.azure.com",
+  user: "adminuser",
+  password: "fractoria%2DB",
+  database: "stitchflow",
+  port: 5432,
+  ssl: { require: true, rejectUnauthorized: false }
+});
+
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -98,7 +116,7 @@ passport.deserializeUser(async (id, done) => {
 // Google Strategy
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "placeholder_id";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "placeholder_secret";
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5001';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 console.log('🔗 BACKEND_URL:', BACKEND_URL);

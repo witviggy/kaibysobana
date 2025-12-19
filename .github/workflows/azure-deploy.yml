@@ -1,0 +1,41 @@
+name: Build and Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: stitchflowacr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push backend
+        run: |
+          docker build ./backend -t stitchflowacr.azurecr.io/stitchflow-backend:${{ github.sha }}
+          docker push stitchflowacr.azurecr.io/stitchflow-backend:${{ github.sha }}
+
+      - name: Build and push frontend
+        run: |
+          docker build ./frontend -t stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
+          docker push stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: stitchflow-app
+          slot-name: production
+          images: |
+            stitchflowacr.azurecr.io/stitchflow-backend:${{ github.sha }}
+            stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
+            quay.io/keycloak/keycloak:23.0
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          multi-container-config-type: compose
+          multi-container-config-file: docker-compose-azure.yml

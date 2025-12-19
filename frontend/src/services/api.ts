@@ -4,7 +4,7 @@ import { Client, Fabric, Order, Notification } from '../types';
 // Base URL for your Express Backend
 // VITE_API_URL should be the backend base URL (without /api)
 // e.g., https://stitchflow-backend.onrender.com
-const BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5000';
+const BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:5001';
 const API_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
 
 // Get auth token from localStorage
@@ -28,8 +28,8 @@ const handleResponse = async (response: Response) => {
 export const getMediaUrl = (path?: string) => {
   if (!path) return '';
   if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')) return path;
-  // Assuming backend is at localhost:5000 based on API_URL
-  return `http://localhost:5000${path}`;
+  // Assuming backend is at localhost:5001 based on API_URL
+  return `http://localhost:5001${path}`;
 };
 
 export const api = {

@@ -1,5 +1,6 @@
 -- Create Keycloak database (for Keycloak auth service)
-CREATE DATABASE keycloak;
+-- CREATE DATABASE keycloak;
+-- CREATE DATABASE stitchflow;
 
 -- Create Users Table
 CREATE TABLE IF NOT EXISTS users (

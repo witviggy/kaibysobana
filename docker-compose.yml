@@ -5,8 +5,8 @@ services:
     image: postgres:15-alpine
     container_name: stitchflow_db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_USER: ${AZURE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-stitchflow}
     ports:
       - "5432:5432"
@@ -33,12 +33,16 @@ services:
     image: quay.io/keycloak/keycloak:23.0
     container_name: stitchflow_keycloak
     environment:
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
-      - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
-      - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-password}
+      KEYCLOAK_ADMIN : ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD : ${KEYCLOAK_ADMIN_PASSWORD}
+      # - KC_DB=postgres
+      # - KC_DB_URL=jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
+      # - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
+      # - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-password}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://${AZURE_POSTGRES_HOST}:${AZURE_POSTGRES_PORT}/${KEYCLOAK_DB}?sslmode=require
+      KC_DB_USERNAME: ${AZURE_POSTGRES_USER}
+      KC_DB_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
     volumes:
       - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
     command: start-dev --import-realm
@@ -55,16 +59,17 @@ services:
     env_file:
       - ./backend/.env
     ports:
-      - "${PORT:-5000}:5000"
+      - "5001:5001"
     environment:
-      - DB_HOST=${DB_HOST:-postgres}
-      - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-password}
-      - DB_NAME=${POSTGRES_DB:-stitchflow}
-      - DB_PORT=${DB_PORT:-5432}
-      - PORT=${PORT:-5000}
+      - DB_HOST=${AZURE_POSTGRES_HOST}
+      - DB_URL=postgres://${AZURE_POSTGRES_USER}:${AZURE_POSTGRES_PASSWORD}@${AZURE_POSTGRES_HOST}:${AZURE_POSTGRES_PORT}/${AZURE_POSTGRES_DB}
+      - DB_USER=${AZURE_POSTGRES_USER}
+      - DB_PASSWORD=${AZURE_POSTGRES_PASSWORD}
+      - DB_NAME=${AZURE_POSTGRES_DB}
+      - DB_PORT=${AZURE_POSTGRES_PORT}
+      - PORT=${PORT}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - BACKEND_URL=${BACKEND_URL:-http://localhost:5000}
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:5001}
       - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
     volumes:
@@ -82,13 +87,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=${BACKEND_URL:-http://localhost:5000}/api
+      - VITE_API_URL=${BACKEND_URL:-http://localhost:5001/api}
       - VITE_KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
       - VITE_KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
       - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-kai-frontend}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
     networks:
