@@ -37,10 +37,6 @@ jobs:
         with:
           app-name: stitchflow-app
           slot-name: production
-          images: |
-            stitchflowacr.azurecr.io/stitchflow-backend:${{ github.sha }}
-            stitchflowacr.azurecr.io/stitchflow-frontend:${{ github.sha }}
-            quay.io/keycloak/keycloak:23.0
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
           multi-container-config-type: compose
           multi-container-config-file: docker-compose-azure.yml
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
