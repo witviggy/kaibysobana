@@ -29,29 +29,29 @@ services:
   #   networks:
   #     - stitchflow-network
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0
-    container_name: stitchflow_keycloak
-    environment:
-      KEYCLOAK_ADMIN : ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD : ${KEYCLOAK_ADMIN_PASSWORD}
-      # - KC_DB=postgres
-      # - KC_DB_URL=jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
-      # - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
-      # - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-password}
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://${AZURE_POSTGRES_HOST}:${AZURE_POSTGRES_PORT}/${KEYCLOAK_DB}?sslmode=require
-      KC_DB_USERNAME: ${AZURE_POSTGRES_USER}
-      KC_DB_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
-    volumes:
-      - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
-    command: start-dev --import-realm
-    # ports:
-    #   - "8080:8080"
-    # depends_on:
-    #   - postgres
-    networks:
-      - stitchflow-network
+  # keycloak:
+  #   image: quay.io/keycloak/keycloak:23.0
+  #   container_name: stitchflow_keycloak
+  #   environment:
+  #     KEYCLOAK_ADMIN : ${KEYCLOAK_ADMIN}
+  #     KEYCLOAK_ADMIN_PASSWORD : ${KEYCLOAK_ADMIN_PASSWORD}
+  #     # - KC_DB=postgres
+  #     # - KC_DB_URL=jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
+  #     # - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
+  #     # - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-password}
+  #     KC_DB: postgres
+  #     KC_DB_URL: jdbc:postgresql://${AZURE_POSTGRES_HOST}:${AZURE_POSTGRES_PORT}/${KEYCLOAK_DB}?sslmode=require
+  #     KC_DB_USERNAME: ${AZURE_POSTGRES_USER}
+  #     KC_DB_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
+  #   volumes:
+  #     - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
+  #   command: start-dev --import-realm
+  #   # ports:
+  #   #   - "8080:8080"
+  #   # depends_on:
+  #   #   - postgres
+  #   networks:
+  #     - stitchflow-network
 
   backend:
     build: ./backend
