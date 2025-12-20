@@ -30,11 +30,6 @@ jobs:
       - name: Build images
         run: |
           docker compose -f docker-compose.yml -f docker-compose-azure.yml build
-
-          docker tag stitchflow_keycloak stitchflowacr.azurecr.io/stitchflow-keycloak:latest
-          docker tag stitchflow_backend stitchflowacr.azurecr.io/stitchflow-backend:latest
-          docker tag stitchflow_frontend stitchflowacr.azurecr.io/stitchflow-frontend:latest
-
       - name: Push images
         run: |
           docker push stitchflowacr.azurecr.io/stitchflow-keycloak:latest
