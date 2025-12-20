@@ -9,8 +9,10 @@
     "bruteForceProtected": true,
 
     "browserSecurityHeaders": {
-        "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self' https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io;"
-      },
+    "contentSecurityPolicy":
+        "frame-src 'self'; frame-ancestors 'self' https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io;"
+    },
+      
     
 
     "clients": [

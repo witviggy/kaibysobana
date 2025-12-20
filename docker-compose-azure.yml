@@ -14,6 +14,7 @@ services:
       KC_HOSTNAME: kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
       KC_HOSTNAME_URL: https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
       KC_HOSTNAME_STRICT_HTTPS: "true"
+      KC_HTTP_ENABLED: true
 
       # Database config
       KC_DB: postgres
