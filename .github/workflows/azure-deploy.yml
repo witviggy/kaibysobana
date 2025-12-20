@@ -23,8 +23,8 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-          # ---------------- BACKEND ----------------
-      - name: Deploy Backend (Container App)
+      # ---------------- BACKEND ----------------
+      - name: Update Backend Container App
         run: |
           az containerapp update \
             --name kaibysobana-backend \
@@ -32,7 +32,7 @@ jobs:
             --image stitchflowacr.azurecr.io/stitchflow-backend:latest
 
       # ---------------- FRONTEND ----------------
-      - name: Deploy Frontend (Container App)
+      - name: Update Frontend Container App
         run: |
           az containerapp update \
             --name kaibysobana-frontend \
@@ -40,7 +40,7 @@ jobs:
             --image stitchflowacr.azurecr.io/stitchflow-frontend:latest
 
       # ---------------- KEYCLOAK ----------------
-      - name: Deploy Keycloak (Container App)
+      - name: Update Keycloak Container App
         run: |
           az containerapp update \
             --name kaibysobana-keycloak \
