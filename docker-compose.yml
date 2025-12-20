@@ -48,8 +48,8 @@ services:
     command: start-dev --import-realm
     ports:
       - "8080:8080"
-    depends_on:
-      - postgres
+    # depends_on:
+    #   - postgres
     networks:
       - stitchflow-network
 
@@ -74,8 +74,8 @@ services:
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
     volumes:
       - uploads_data:/app/uploads
-    depends_on:
-      - postgres
+    # depends_on:
+    #   - postgres
     networks:
       - stitchflow-network
 
@@ -97,7 +97,7 @@ services:
       - stitchflow-network
 
 volumes:
-  postgres_data:
+  # postgres_data:
   uploads_data:
 
 networks:
