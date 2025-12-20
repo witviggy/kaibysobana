@@ -23,6 +23,10 @@ services:
 
       # CSP & Web Origins
       KC_FRONTEND_URL: https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
+      KC_CONTENT_SECURITY_POLICY: >
+        frame-src 'self' https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io;
+        frame-ancestors 'self' https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io;
+        object-src 'none';
 
       command: start-dev --import-realm
 
