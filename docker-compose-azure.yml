@@ -4,19 +4,25 @@ services:
   keycloak:
     image: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
     build: ./keycloak
+    container_name: stitchflow_keycloak
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # Admin user
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
 
+      # Keycloak proxy / hostname config
       KC_PROXY: edge
-      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL}
-      KC_HOSTNAME_URL: https://${KEYCLOAK_PUBLIC_URL}
-      KC_HOSTNAME_STRICT_HTTPS: "true"
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_URL: http://localhost:8080
+      KC_HOSTNAME_STRICT_HTTPS: "false"
 
+      # Database config
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://${AZURE_POSTGRES_HOST}:5432/keycloak?sslmode=require
-      KC_DB_USERNAME: ${AZURE_POSTGRES_USER}
-      KC_DB_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: password
+
+    command: start-dev --import-realm
 
   backend:
     image: stitchflowacr.azurecr.io/stitchflow-backend:latest
