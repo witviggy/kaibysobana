@@ -6,11 +6,22 @@ echo "Starting Keycloak..."
 # Start Keycloak
 /opt/keycloak/bin/kc.sh start-dev --import-realm &
 
-# Wait until Keycloak is ready (internal HTTP)
-until curl -sf http://localhost:8080/realms/master; do
-  echo "Waiting for Keycloak..."
+echo "Waiting for Keycloak to be ready..."
+
+# Simple: Wait for port 8080 to be open
+until (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1; do
+  echo "Waiting for Keycloak (port 8080 open)..."
   sleep 5
 done
+
+# Stronger: Wait for /realms/master to return HTTP 200
+until printf "GET /realms/master HTTP/1.1\r\nHost: localhost:8080\r\nConnection: close\r\n\r\n" > /dev/tcp/localhost/8080 2>/dev/null && \
+      tail -1 < /dev/tcp/localhost/8080 | grep -q "200 OK"; do
+  echo "Waiting for Keycloak (/realms/master ready)..."
+  sleep 5
+done
+
+echo "Keycloak is up. Configuring..."
 
 echo "Keycloak is up. Configuring..."
 
