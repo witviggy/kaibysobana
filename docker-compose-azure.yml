@@ -13,7 +13,7 @@ services:
       # Keycloak proxy / hostname config
       KC_PROXY: edge
       KC_HOSTNAME: localhost
-      KC_HOSTNAME_URL: http://localhost:8080
+      KC_HOSTNAME_URL: https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
       KC_HOSTNAME_STRICT_HTTPS: "false"
 
       # Database config
