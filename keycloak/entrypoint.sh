@@ -6,38 +6,28 @@
 
 # Wait for Keycloak to be ready
 echo "Waiting for Keycloak to start..."
-until curl -s -k https://${KC_HOSTNAME}/realms/master; do
+until curl -s -k https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/realms/master; do
   sleep 5
 done
 
-# Hard-coded client configuration
-CLIENT_ID=kai-frontend
-REALM=kai
-FRONTEND_URL=${KC_FRONTEND_URL}
-KEYCLOAK_HOSTNAME=${KC_HOSTNAME}
-
-# Set admin credentials
-ADMIN_USER=${KEYCLOAK_ADMIN}
-ADMIN_PASS=${KEYCLOAK_ADMIN_PASSWORD}
-
 /opt/keycloak/bin/kc.sh config credentials \
-  --server https://$KEYCLOAK_HOSTNAME \
+  --server https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io \
   --realm master \
-  --user $ADMIN_USER \
-  --password $ADMIN_PASS
+  --user admin \
+  --password admin
 
 # Create client (ignore if exists)
-/opt/keycloak/bin/kc.sh create clients -r $REALM \
-  -s clientId=$CLIENT_ID \
+/opt/keycloak/bin/kc.sh create clients -r kai \
+  -s clientId=kai-frontend \
   -s publicClient=true \
   -s directAccessGrantsEnabled=true || true
 
 # Update Web Origins & Redirect URIs
-/opt/keycloak/bin/kc.sh update clients/$CLIENT_ID -r $REALM \
-  -s webOrigins="[\"$FRONTEND_URL\"]" \
-  -s redirectUris="[\"$FRONTEND_URL/*\"]"
+/opt/keycloak/bin/kc.sh update clients/kai-frontend -r kai \
+  -s webOrigins="[\"https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io\"]" \
+  -s redirectUris="[\"https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/*\"]"
 
-echo "Keycloak client configured for frontend: $FRONTEND_URL"
+echo "Keycloak client configured for frontend: https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io"
 
 # Keep container running
 wait
