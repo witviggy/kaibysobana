@@ -1,6 +1,7 @@
 FROM quay.io/keycloak/keycloak:23.0
 
 USER root
+EXPOSE 8080
 
 WORKDIR /opt/keycloak/data
 
