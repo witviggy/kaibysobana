@@ -25,7 +25,7 @@ const Login: React.FC = () => {
             <div className="bg-white rounded-xl shadow-xl border border-zinc-200 p-8 w-full max-w-md text-center">
                 <div className="mb-8 flex justify-center">
                     <img
-                        src="/src/logo/kailogov1.png"
+                        src="/logo/kailogov1.png"
                         alt="கை(kai)"
                         className="w-16 h-16 rounded-xl object-contain"
                     />
