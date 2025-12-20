@@ -2,6 +2,7 @@ version: "3.8"
 
 services:
   keycloak:
+    build: ./keycloak
     image: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
     environment:
       # Admin
