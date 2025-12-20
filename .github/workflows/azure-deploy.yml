@@ -23,7 +23,25 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # ---------------- BACKEND ----------------
+      # -------------------------
+      # BUILD & PUSH IMAGES
+      # -------------------------
+
+      - name: Build images
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose-azure.yml build
+
+          docker tag stitchflow_keycloak stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+          docker tag stitchflow_backend stitchflowacr.azurecr.io/stitchflow-backend:latest
+          docker tag stitchflow_frontend stitchflowacr.azurecr.io/stitchflow-frontend:latest
+
+      - name: Push images
+        run: |
+          docker push stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+          docker push stitchflowacr.azurecr.io/stitchflow-backend:latest
+          docker push stitchflowacr.azurecr.io/stitchflow-frontend:latest
+
+      # ---------------- Deploy BACKEND ----------------
       - name: Update Backend Container App
         run: |
           az containerapp update \
@@ -31,7 +49,7 @@ jobs:
             --resource-group Deep_PerPro \
             --image stitchflowacr.azurecr.io/stitchflow-backend:latest
 
-      # ---------------- FRONTEND ----------------
+      # ---------------- Deploy FRONTEND ----------------
       - name: Update Frontend Container App
         run: |
           az containerapp update \
@@ -39,7 +57,7 @@ jobs:
             --resource-group Deep_PerPro \
             --image stitchflowacr.azurecr.io/stitchflow-frontend:latest
 
-      # ---------------- KEYCLOAK ----------------
+      # ---------------- Deploy KEYCLOAK ----------------
       - name: Update Keycloak Container App
         run: |
           az containerapp update \
