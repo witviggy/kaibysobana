@@ -1,7 +1,7 @@
 #!/bin/sh
 # Fully hard-coded Keycloak startup script
 
-# Start Keycloak in dev mode
+# Start Keycloak in dev mode with realm import
 /opt/keycloak/bin/kc.sh start-dev --import-realm &
 
 # Wait for Keycloak to be ready
@@ -10,6 +10,7 @@ until curl -s -k https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia
   sleep 5
 done
 
+# Set credentials
 /opt/keycloak/bin/kc.sh config credentials \
   --server https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io \
   --realm master \
@@ -17,17 +18,20 @@ done
   --password admin
 
 # Create client (ignore if exists)
-/opt/keycloak/bin/kc.sh create clients -r kai \
-  -s clientId=kai-frontend \
+CLIENT_ID=kai-frontend
+REALM=kai
+
+/opt/keycloak/bin/kc.sh create clients -r $REALM \
+  -s clientId=$CLIENT_ID \
   -s publicClient=true \
   -s directAccessGrantsEnabled=true || true
 
-# Update Web Origins & Redirect URIs
-/opt/keycloak/bin/kc.sh update clients/kai-frontend -r kai \
+# Update Web Origins & Redirect URIs for CORS / iframe
+/opt/keycloak/bin/kc.sh update clients/$CLIENT_ID -r $REALM \
   -s webOrigins="[\"https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io\"]" \
   -s redirectUris="[\"https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/*\"]"
 
-echo "Keycloak client configured for frontend: https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io"
+echo "Keycloak client configured for frontend."
 
 # Keep container running
 wait
