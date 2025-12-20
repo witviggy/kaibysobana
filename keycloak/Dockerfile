@@ -1,14 +1,10 @@
 FROM quay.io/keycloak/keycloak:23.0
 
-# Use a writable directory for custom scripts
-WORKDIR /tmp
+WORKDIR /opt/keycloak/data
 
-# Copy realm config
-COPY realm-config.json /tmp/realm-config.json
+# Copy realm config and entrypoint
+COPY realm-config.json /opt/keycloak/data/import/
+COPY keycloak-entrypoint.sh /opt/keycloak/data/keycloak-entrypoint.sh
 
-# Copy entrypoint script
-COPY keycloak-entrypoint.sh /tmp/keycloak-entrypoint.sh
-RUN chmod +x /tmp/keycloak-entrypoint.sh
-
-# Start the container with custom entrypoint
-ENTRYPOINT ["/tmp/keycloak-entrypoint.sh"]
+# Run the script directly with sh
+ENTRYPOINT ["sh", "/opt/keycloak/data/keycloak-entrypoint.sh"]
