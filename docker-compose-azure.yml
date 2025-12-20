@@ -2,25 +2,26 @@ version: "3.8"
 
 services:
   keycloak:
-    image: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
-    build: ./keycloak
-    container_name: stitchflow_keycloak
-    environment:
-      # Admin user
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+  image: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+  environment:
+    # Admin
+    KEYCLOAK_ADMIN: admin
+    KEYCLOAK_ADMIN_PASSWORD: admin
 
-      # Keycloak proxy / hostname config
-      KC_PROXY: edge
-      KC_HOSTNAME: kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
-      KC_HOSTNAME_URL: https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
-      KC_HOSTNAME_STRICT_HTTPS: "false"
+    # Host config
+    KC_PROXY: edge
+    KC_HOSTNAME: kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
+    KC_HOSTNAME_URL: https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
+    KC_HOSTNAME_STRICT_HTTPS: "true"
 
-      # Database config
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: postgres
-      KC_DB_PASSWORD: password
+    # Database config
+    KC_DB: postgres
+    KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak?sslmode=require
+    KC_DB_USERNAME: postgres
+    KC_DB_PASSWORD: password
+
+    # CSP & Web Origins
+    KC_FRONTEND_URL: https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io
 
     command: start-dev --import-realm
 
