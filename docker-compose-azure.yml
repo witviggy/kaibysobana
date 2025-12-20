@@ -3,6 +3,7 @@ version: "3.8"
 services:
   keycloak:
     image: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
+    build: ./keycloak
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
