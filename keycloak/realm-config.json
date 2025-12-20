@@ -16,10 +16,10 @@
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
             "redirectUris": [
-                "https://kaibyshobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/*"
+                "https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/*"
             ],
             "webOrigins": [
-                "https://kaibyshobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io"
+                "https://kaibysobana-frontend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io"
             ],
             "attributes": {
                 "pkce.code.challenge.method": "S256"

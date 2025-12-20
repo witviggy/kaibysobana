@@ -4,7 +4,7 @@ import { Client, Fabric, Order, Notification } from '../types';
 // Base URL for your Express Backend
 // VITE_API_URL should be the backend base URL (without /api)
 // e.g., https://stitchflow-backend.onrender.com
-const BASE_URL = (import.meta as any).env.VITE_API_URL || 'https://kaibyshobana-backend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io';
+const BASE_URL = (import.meta as any).env.VITE_API_URL || 'https://kaibysobana-backend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io';
 const API_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
 
 // Get auth token from localStorage
@@ -29,7 +29,7 @@ export const getMediaUrl = (path?: string) => {
   if (!path) return '';
   if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')) return path;
   // Assuming backend is at localhost:5001 based on API_URL
-  return `https://kaibyshobana-backend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io${path}`;
+  return `https://kaibysobana-backend.purpleisland-0b71ed79.centralindia.azurecontainerapps.io${path}`;
 };
 
 export const api = {

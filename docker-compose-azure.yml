@@ -1,49 +1,51 @@
-version: '3.8'
+version: "3.8"
 
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:23.0
-    container_name: stitchflow_keycloak
+    image: stitchflowacr.azurecr.io/stitchflow-keycloak:latest
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://${AZURE_POSTGRES_HOST}:5432/${KEYCLOAK_DB:-keycloak}?sslmode=require
+      KC_DB_URL: jdbc:postgresql://${AZURE_POSTGRES_HOST}:5432/keycloak?sslmode=require
       KC_DB_USERNAME: ${AZURE_POSTGRES_USER}
       KC_DB_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
-    volumes:
-      - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
-    command: start --import-realm  # Use 'start' for production (not dev)
+
+    command: >
+      start --import-realm
     ports:
       - "8080:8080"
 
   backend:
-    image: stitchflowacr.azurecr.io/stitchflow-backend:latest  # Will be built/pushed
-    # build: ./backend
-    env_file:
-      - ./backend/.env
+    image: stitchflowacr.azurecr.io/stitchflow-backend:latest
     environment:
-      - DB_HOST=${AZURE_POSTGRES_HOST}
-      - DB_URL=postgres://${AZURE_POSTGRES_USER}:${AZURE_POSTGRES_PASSWORD}@${AZURE_POSTGRES_HOST}:5432/${AZURE_POSTGRES_DB}
-      # Other env vars...
-    volumes:
-      - uploads_data:/app/uploads
+      NODE_ENV: production
+
+      DB_HOST: ${AZURE_POSTGRES_HOST}
+      DB_PORT: 5432
+      DB_NAME: ${AZURE_POSTGRES_DB}
+      DB_USER: ${AZURE_POSTGRES_USER}
+      DB_PASSWORD: ${AZURE_POSTGRES_PASSWORD}
+
+      DATABASE_URL: >
+        postgres://${AZURE_POSTGRES_USER}:${AZURE_POSTGRES_PASSWORD}
+        @${AZURE_POSTGRES_HOST}:5432/${AZURE_POSTGRES_DB}?sslmode=require
+
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+
     ports:
       - "5001:5001"
 
   frontend:
     image: stitchflowacr.azurecr.io/stitchflow-frontend:latest
-    # build: ./frontend
-    env_file:
-      - ./frontend/.env
     environment:
-      - VITE_API_URL=${BACKEND_URL:-https://<your-app>.azurewebsites.net:5001/api}
-      # Adjust URLs for production (use App Service domain)
+      VITE_API_URL: ${BACKEND_PUBLIC_URL}
+      VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL}
+      VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+
     ports:
       - "3000:3000"
-
-volumes:
-  uploads_data:
-
-networks:
-  default:  # App Service handles internal networking
