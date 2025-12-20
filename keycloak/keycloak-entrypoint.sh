@@ -4,7 +4,12 @@ set -e
 echo "Starting Keycloak..."
 
 # Start Keycloak
-/opt/keycloak/bin/kc.sh start-dev --import-realm &
+kc.sh start \
+  --import-realm \
+  --proxy=edge \
+  --hostname-strict=false \
+  --spi-login-cookie-samesite=None \
+  --http-enabled=true &
 
 echo "Waiting for Keycloak to be ready..."
 
