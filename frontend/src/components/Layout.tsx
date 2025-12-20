@@ -6,6 +6,14 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import Kailogo from '@/logo/kailogov1.png'; // using alias @ -> src/
+
+<img
+  src={Kailogo}
+  alt="கை(kai)"
+  className="w-8 h-8 rounded-lg object-contain"
+/>
+
 
 // Pages
 import Dashboard from '../pages/Dashboard';
@@ -130,7 +138,7 @@ export const Layout: React.FC = () => {
                 <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100">
                     <div className="flex items-center gap-3">
                         <img
-                            src="/src/logo/kailogov1.png"
+                            src={Kailogo}
                             alt="கை(kai)"
                             className="w-8 h-8 rounded-lg object-contain"
                         />
