@@ -5,8 +5,7 @@
 /opt/keycloak/bin/kc.sh start-dev --import-realm &
 
 # Wait for Keycloak to be ready
-echo "Waiting for Keycloak to start..."
-until curl -s -k https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/realms/master; do
+until wget -q --spider https://kaibysobana-keycloak.purpleisland-0b71ed79.centralindia.azurecontainerapps.io/realms/master; do
   sleep 5
 done
 
