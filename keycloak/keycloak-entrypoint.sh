@@ -11,7 +11,6 @@ echo "Starting Keycloak..."
   --spi-login-cookie-samesite=None \
   --http-enabled=true &
 
-
 echo "Waiting for Keycloak to be ready..."
 
 # Simple: Wait for port 8080 to be open
