@@ -422,7 +422,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // Serve uploaded files statically
-app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/api/uploads', express.static(UPLOADS_DIR));
 
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {

@@ -16,10 +16,11 @@
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
             "redirectUris": [
-                "http://localhost:3000/*"
+		"https://substanceai.cloud/*",
+		"https://substanceai.cloud/silent-check-sso.html"
             ],
             "webOrigins": [
-                "http://localhost:3000"
+                "https://substanceai.cloud"
             ],
             "attributes": {
                 "pkce.code.challenge.method": "S256"
