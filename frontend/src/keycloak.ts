@@ -1,11 +1,12 @@
 import Keycloak from 'keycloak-js';
+import config from './config';
 
 // Keycloak configuration
 // These values will be configured after Keycloak realm/client is set up
 const keycloakConfig = {
-    url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-    realm: import.meta.env.VITE_KEYCLOAK_REALM || 'kai',
-    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'kai-frontend',
+    url: config.KEYCLOAK_URL,
+    realm: config.KEYCLOAK_REALM,
+    clientId: config.KEYCLOAK_CLIENT_ID,
 };
 
 const keycloak = new Keycloak(keycloakConfig);

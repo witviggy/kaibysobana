@@ -14,6 +14,13 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Validate critical environment variables
+const requiredEnvVars = ['DATABASE_URL', 'DB_HOST', 'FRONTEND_URL', 'BACKEND_URL', 'KEYCLOAK_URL'];
+// Check either DATABASE_URL or DB_HOST
+if (!process.env.DATABASE_URL && !process.env.DB_HOST) {
+  console.warn("⚠️  WARNING: Database configuration missing (DATABASE_URL or DB_HOST)");
+}
+
 const path = require('path');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
@@ -44,7 +51,7 @@ if (isProduction) {
 }
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Keep dev fallback for local dev convenience
   credentials: true
 }));
 app.use(express.json());
@@ -74,9 +81,9 @@ const poolConfig = process.env.DATABASE_URL
   }
   : {
     user: process.env.DB_USER || 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST, // No fallback to localhost in production ideally, but keeping strict env usage
     database: process.env.DB_NAME || 'stitchflow',
-    password: process.env.DB_PASSWORD || 'password',
+    password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT || 5432,
   };
 
