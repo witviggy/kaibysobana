@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useSearch } from '../context/SearchContext';
 
 // Pages
 import Dashboard from '../pages/Dashboard';
@@ -20,7 +21,7 @@ import Orders from '../pages/Orders';
 import OrderDetail from '../pages/OrderDetail';
 import ActivityLogs from '../pages/ActivityLogs';
 import Financials from '../pages/Financials';
-import SettingsPage from '../pages/Settings';
+import SettingsModal from '../pages/Settings';
 import Calendar from '../pages/Calendar';
 import Catalog from '../pages/Catalog';
 
@@ -45,9 +46,10 @@ export const Layout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const userMenuRef = useRef<HTMLDivElement>(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const { globalSearchQuery, setGlobalSearchQuery } = useSearch();
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     // Global Data State
     const [allClients, setAllClients] = useState<any[]>([]);
@@ -73,6 +75,10 @@ export const Layout: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        setGlobalSearchQuery('');
+    }, [location.pathname, setGlobalSearchQuery]);
+
+    useEffect(() => {
         const fetchData = async () => {
             try {
                 const [clients, orders, fabrics] = await Promise.all([
@@ -90,18 +96,24 @@ export const Layout: React.FC = () => {
         fetchData();
     }, []);
 
+    // Helper to match from start of string or start of any word
+    const matchesSearch = (text: string | undefined, query: string) => {
+        if (!text || !query) return false;
+        const lowerText = text.toString().toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        return lowerText.startsWith(lowerQuery) || lowerText.split(/\s+/).some(word => word.startsWith(lowerQuery));
+    };
+
     const filteredClients = allClients.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchQuery.toLowerCase())
+        matchesSearch(c.name, globalSearchQuery)
     ).slice(0, 3);
 
     const filteredOrders = allOrders.filter(o =>
-        o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.clientName.toLowerCase().includes(searchQuery.toLowerCase())
+        matchesSearch(o.id ? o.id.toString() : '', globalSearchQuery) || matchesSearch(o.clientName, globalSearchQuery)
     ).slice(0, 3);
 
     const filteredFabrics = allFabrics.filter(f =>
-        f.name.toLowerCase().includes(searchQuery.toLowerCase())
+        matchesSearch(f.name, globalSearchQuery)
     ).slice(0, 3);
 
     const hasResults = filteredClients.length > 0 || filteredOrders.length > 0 || filteredFabrics.length > 0;
@@ -151,17 +163,10 @@ export const Layout: React.FC = () => {
                     <SidebarItem icon={CalendarIcon} label="Calendar" path="/calendar" isActive={isActive('/calendar')} onClick={() => setSidebarOpen(false)} />
                     <SidebarItem icon={PieChart} label="Financials" path="/financials" isActive={isActive('/financials')} onClick={() => setSidebarOpen(false)} />
 
-                    <div className="pt-6">
-                        <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">System</p>
-                        <SidebarItem icon={ClipboardList} label="Track Updates" path="/activity-logs" isActive={isActive('/activity-logs')} onClick={() => setSidebarOpen(false)} />
-                    </div>
                 </div>
 
                 <div className="p-3 border-t border-zinc-100">
-                    <button
-                        onClick={() => setUserMenuOpen(!userMenuOpen)}
-                        className="w-full flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-lg transition-colors text-left"
-                    >
+                    <div className="w-full flex items-center gap-3 p-2 text-left">
                         <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 overflow-hidden border border-zinc-200">
                             {(user?.avatarUrl || user?.avatar_url) ? (
                                 <img src={user.avatarUrl || user.avatar_url} alt="User" className="w-full h-full object-cover" />
@@ -173,8 +178,7 @@ export const Layout: React.FC = () => {
                             <p className="text-sm font-medium text-zinc-900 truncate">{user?.name || 'User'}</p>
                             <p className="text-xs text-zinc-500 truncate">{user?.email || ''}</p>
                         </div>
-                        <ChevronDown size={14} className="text-zinc-400" />
-                    </button>
+                    </div>
                 </div>
             </aside>
 
@@ -193,16 +197,16 @@ export const Layout: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Search..."
-                                value={searchQuery}
+                                value={globalSearchQuery}
                                 onChange={(e) => {
-                                    setSearchQuery(e.target.value);
+                                    setGlobalSearchQuery(e.target.value);
                                     setIsSearchFocused(true);
                                 }}
                                 onFocus={() => setIsSearchFocused(true)}
                                 className="w-full pl-9 pr-4 py-2 rounded-lg bg-zinc-50 border border-transparent focus:bg-white focus:border-zinc-300 focus:ring-0 text-sm transition-all placeholder:text-zinc-400 text-zinc-900"
                             />
 
-                            {isSearchFocused && searchQuery.length > 0 && (
+                            {!(location.pathname === '/clients' || location.pathname === '/orders' || location.pathname === '/stock') && isSearchFocused && globalSearchQuery.length > 0 && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-zinc-200 z-50 overflow-hidden">
                                     {/* Search results rendering - Simplified for brevity in layout, but logic is kept */}
                                     {hasResults ? (
@@ -212,7 +216,7 @@ export const Layout: React.FC = () => {
                                                 <div className="px-2 mb-2">
                                                     <p className="px-3 py-2 text-xs font-semibold text-zinc-400 uppercase">Clients</p>
                                                     {filteredClients.map(c => (
-                                                        <Link key={c.id} to={`/clients/${c.id}`} onClick={() => setSearchQuery('')} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-zinc-50 transition-colors">
+                                                        <Link key={c.id} to={`/clients/${c.id}`} onClick={() => setGlobalSearchQuery('')} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-zinc-50 transition-colors">
                                                             <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500"><Users size={14} /></div>
                                                             <div><p className="text-sm font-medium text-zinc-900">{c.name}</p></div>
                                                         </Link>
@@ -233,7 +237,7 @@ export const Layout: React.FC = () => {
                         <div className="relative" ref={userMenuRef}>
                             <button
                                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                                className="w-8 h-8 rounded-full bg-zinc-200 overflow-hidden hover:ring-2 hover:ring-zinc-200 transition-all ml-2"
+                                className="w-8 h-8 rounded-full bg-zinc-200 overflow-hidden hover:ring-2 hover:ring-zinc-300 transition-all ml-2"
                             >
                                 {(user?.avatarUrl || user?.avatar_url) ? (
                                     <img src={user.avatarUrl || user.avatar_url} alt="User" className="w-full h-full object-cover" />
@@ -244,7 +248,7 @@ export const Layout: React.FC = () => {
 
                             {userMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-zinc-200 z-50 overflow-hidden py-1">
-                                    <button onClick={() => { setUserMenuOpen(false); navigate('/settings'); }} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 flex items-center gap-2">
+                                    <button onClick={() => { setUserMenuOpen(false); setIsSettingsOpen(true); }} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 flex items-center gap-2">
                                         <Settings size={16} /> Settings
                                     </button>
                                     <div className="border-t border-zinc-100 my-1"></div>
@@ -263,7 +267,7 @@ export const Layout: React.FC = () => {
                         <Route path="/clients" element={<Clients />} />
                         <Route path="/clients/new" element={<ClientForm />} />
                         <Route path="/clients/edit/:id" element={<ClientForm />} />
-                        <Route path="/clients/new-order" element={<NewClientOrder />} />
+                        <Route path="/orders/new-order" element={<NewClientOrder />} />
                         <Route path="/clients/:id" element={<ClientDetail />} />
                         <Route path="/stock" element={<FabricStock />} />
                         <Route path="/stock/new" element={<NewFabric />} />
@@ -276,7 +280,6 @@ export const Layout: React.FC = () => {
                         <Route path="/catalog" element={<Catalog />} />
                         <Route path="/financials" element={<Financials />} />
                         <Route path="/activity-logs" element={<ActivityLogs />} />
-                        <Route path="/settings" element={<SettingsPage />} />
                         <Route path="*" element={
                             <div className="flex flex-col items-center justify-center h-full text-zinc-400">
                                 <p className="text-lg font-medium">Page not found</p>
@@ -285,6 +288,8 @@ export const Layout: React.FC = () => {
                     </Routes>
                 </div>
             </main>
+
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );
 };

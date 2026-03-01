@@ -10,7 +10,7 @@
 /* === CSS Variables (Design Tokens) === */
 :root {
   /* Brand - Zinc/Neutral (Professional & Clean) */
-  --primary-50:  #f9fafb;
+  --primary-50: #f9fafb;
   --primary-100: #f4f4f5;
   --primary-200: #e4e4e7;
   --primary-300: #d4d4d8;
@@ -20,26 +20,27 @@
   --primary-700: #3f3f46;
   --primary-800: #27272a;
   --primary-900: #18181b;
-  --primary-950: #09090b; /* Almost Black */
+  --primary-950: #09090b;
+  /* Almost Black */
 
   /* Semantic Colors */
   /* Success - Muted Emerald */
-  --success-50:  #f0fdf4;
+  --success-50: #f0fdf4;
   --success-500: #22c55e;
   --success-600: #16a34a;
 
   /* Warning - Muted Amber */
-  --warning-50:  #fffbeb;
+  --warning-50: #fffbeb;
   --warning-500: #f59e0b;
   --warning-600: #d97706;
 
   /* Error - Muted Red */
-  --error-50:  #fef2f2;
+  --error-50: #fef2f2;
   --error-500: #ef4444;
   --error-600: #dc2626;
 
   /* Neutral - Slate (for text) */
-  --neutral-50:  #f8fafc;
+  --neutral-50: #f8fafc;
   --neutral-100: #f1f5f9;
   --neutral-200: #e2e8f0;
   --neutral-300: #cbd5e1;
@@ -51,13 +52,15 @@
   --neutral-900: #0f172a;
 
   /* UI Backgrounds */
-  --bg-page:   #ffffff;
-  --bg-card:   #ffffff;
+  --bg-page: #ffffff;
+  --bg-card: #ffffff;
   --bg-subtle: #fafafa;
 
   /* Borders */
-  --border-light: #e4e4e7; /* primary-200 */
-  --border-dark:  #d4d4d8; /* primary-300 */
+  --border-light: #e4e4e7;
+  /* primary-200 */
+  --border-dark: #d4d4d8;
+  /* primary-300 */
 
   /* Shadows (Subtle/Flat) */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
@@ -72,7 +75,7 @@
   --radius-full: 9999px;
 
   /* Transitions */
-  --transition-fast:   100ms ease;
+  --transition-fast: 100ms ease;
   --transition-normal: 200ms ease;
 }
 
@@ -88,13 +91,25 @@ body {
 
 /* === Animation Keyframes (Subtle) === */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* === Utility Classes === */
@@ -107,9 +122,17 @@ body {
 }
 
 /* Used for staggered lists */
-.delay-100 { animation-delay: 50ms; }
-.delay-200 { animation-delay: 100ms; }
-.delay-300 { animation-delay: 150ms; }
+.delay-100 {
+  animation-delay: 50ms;
+}
+
+.delay-200 {
+  animation-delay: 100ms;
+}
+
+.delay-300 {
+  animation-delay: 150ms;
+}
 
 /* === Premium Card Styles (Minimalist) === */
 .card-premium {
@@ -251,7 +274,8 @@ body {
 /* === Table Styles === */
 .table-premium {
   width: 100%;
-  border-collapse: collapse; /* Collapsed for clean lines */
+  border-collapse: collapse;
+  /* Collapsed for clean lines */
 }
 
 .table-premium th {
@@ -358,4 +382,9 @@ body {
   height: 100%;
   background: var(--primary-900);
   border-radius: var(--radius-full);
+}
+
+/* === Chart Focus Fix === */
+.recharts-wrapper *:focus {
+  outline: none !important;
 }

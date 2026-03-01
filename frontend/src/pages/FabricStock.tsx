@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Scissors, AlertCircle, ArrowUpRight, Package, IndianRupee, Download } from 'lucide-react';
+import { Plus, Search, Scissors, ArrowUpRight, IndianRupee, AlertTriangle, ChevronRight, Download, Package, AlertCircle } from 'lucide-react';
 import { api, getMediaUrl } from '../services/api';
 import { SkeletonCard } from '../components/Skeleton';
+import { useSearch } from '../context/SearchContext';
 import { useToast } from '../context/ToastContext';
 
 const FabricStock: React.FC = () => {
@@ -11,7 +12,7 @@ const FabricStock: React.FC = () => {
     const { addToast } = useToast();
     const [fabrics, setFabrics] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const { globalSearchQuery: searchQuery } = useSearch();
 
     useEffect(() => {
         const fetchFabrics = async () => {
@@ -28,11 +29,19 @@ const FabricStock: React.FC = () => {
         fetchFabrics();
     }, [addToast]);
 
-    const filteredFabrics = fabrics.filter(f =>
-        f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.color.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (f.id && f.id.toString().toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const matchesSearch = (text: string | undefined, query: string) => {
+        if (!text || !query) return false;
+        const lowerText = text.toString().toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        return lowerText.startsWith(lowerQuery) || lowerText.split(/\s+/).some(word => word.startsWith(lowerQuery));
+    };
+
+    const filteredFabrics = fabrics.filter(f => {
+        if (!searchQuery) return true;
+        return matchesSearch(f.name, searchQuery) ||
+            matchesSearch(f.color, searchQuery) ||
+            matchesSearch(f.id ? f.id.toString() : '', searchQuery);
+    });
 
     const lowStockCount = fabrics.filter(f => f.metersAvailable < 10).length;
     const totalValue = fabrics.reduce((acc, curr) => acc + (curr.metersAvailable * curr.pricePerMeter), 0);
@@ -127,20 +136,6 @@ const FabricStock: React.FC = () => {
                             <p className="text-xl font-semibold text-zinc-900">₹{totalValue.toLocaleString()}</p>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            {/* Search */}
-            <div className="flex gap-4">
-                <div className="relative flex-1 max-w-lg">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search fabrics by name or color..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 rounded-md bg-white border border-zinc-200 text-sm focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all placeholder:text-zinc-400"
-                    />
                 </div>
             </div>
 

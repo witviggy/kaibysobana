@@ -1,35 +1,50 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Plus, User, Phone, Mail, MapPin, ArrowUpRight, Users, Download } from 'lucide-react';
+import { Search, Filter, Plus, User, Phone, Mail, MapPin, ArrowUpRight, Users, Download, Trash2 } from 'lucide-react';
 import { api, getMediaUrl } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import ConfirmModal from '../components/ConfirmModal';
+import { useSearch } from '../context/SearchContext';
 
 const Clients: React.FC = () => {
     const navigate = useNavigate();
+    const { addToast } = useToast();
     const [clients, setClients] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const { globalSearchQuery: searchQuery } = useSearch();
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [clientToDelete, setClientToDelete] = useState<any>(null);
+
+    const fetchClients = async () => {
+        try {
+            const data = await api.getClients();
+            setClients(data);
+        } catch (error) {
+            console.error("Failed to fetch clients", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchClients = async () => {
-            try {
-                const data = await api.getClients();
-                setClients(data);
-            } catch (error) {
-                console.error("Failed to fetch clients", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchClients();
     }, []);
 
-    const filteredClients = clients.filter(client =>
-        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (client.phone && client.phone.includes(searchQuery)) ||
-        (client.address && client.address.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const matchesSearch = (text: string | undefined, query: string) => {
+        if (!text || !query) return false;
+        const lowerText = text.toString().toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        return lowerText.startsWith(lowerQuery) || lowerText.split(/\s+/).some(word => word.startsWith(lowerQuery));
+    };
+
+    const filteredClients = clients.filter(client => {
+        if (!searchQuery) return true;
+        return matchesSearch(client.name, searchQuery) ||
+            matchesSearch(client.email, searchQuery) ||
+            (client.phone && client.phone.startsWith(searchQuery)) ||
+            matchesSearch(client.address, searchQuery);
+    });
 
     const activeCount = clients.filter(c => c.status === 'Active').length;
 
@@ -47,6 +62,20 @@ const Clients: React.FC = () => {
             }));
             downloadCSV(dataToExport, `Clients_${new Date().toISOString().split('T')[0]}`);
         });
+    };
+
+    const handleDeleteClient = async () => {
+        if (!clientToDelete) return;
+        try {
+            await api.deleteClient(clientToDelete.id);
+            addToast("Client deleted successfully", 'success');
+            setIsDeleteModalOpen(false);
+            setClientToDelete(null);
+            fetchClients();
+        } catch (error) {
+            console.error(error);
+            addToast("Failed to delete client", 'error');
+        }
     };
 
     return (
@@ -73,41 +102,52 @@ const Clients: React.FC = () => {
                 </div>
             </div>
 
-            {/* Stats Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-lg border border-zinc-200">
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Clients</p>
-                    <p className="text-2xl font-semibold text-zinc-900 mt-1">{clients.length}</p>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
+                            <Users size={18} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Clients</p>
+                            <p className="text-xl font-semibold text-zinc-900">{clients.length}</p>
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-zinc-200">
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Active</p>
-                    <p className="text-2xl font-semibold text-zinc-900 mt-1">{activeCount}</p>
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-emerald-600">
+                            <ArrowUpRight size={18} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Active</p>
+                            <p className="text-xl font-semibold text-zinc-900">{activeCount}</p>
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-zinc-200">
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Inactive</p>
-                    <p className="text-2xl font-semibold text-zinc-400 mt-1">{clients.length - activeCount}</p>
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-400">
+                            <User size={18} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Inactive</p>
+                            <p className="text-xl font-semibold text-zinc-400">{clients.length - activeCount}</p>
+                        </div>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-zinc-200">
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">New This Month</p>
-                    <p className="text-2xl font-semibold text-zinc-900 mt-1">+{Math.min(3, clients.length)}</p>
+                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-blue-500">
+                            <Plus size={18} />
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">New This Month</p>
+                            <p className="text-xl font-semibold text-zinc-900">+{Math.min(3, clients.length)}</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            {/* Search & Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search clients..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 rounded-md bg-white border border-zinc-200 text-sm focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all placeholder:text-zinc-400"
-                    />
-                </div>
-                <button className="flex items-center gap-2 px-4 py-2 border border-zinc-200 rounded-md text-sm font-medium text-zinc-700 hover:bg-zinc-50 bg-white transition-all">
-                    <Filter size={16} /> Filters
-                </button>
             </div>
 
             {/* Client Grid */}
@@ -119,9 +159,9 @@ const Clients: React.FC = () => {
                         <div
                             key={client.id}
                             onClick={() => navigate(`/clients/${client.id}`)}
-                            className="bg-white rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors cursor-pointer group flex flex-col overflow-hidden"
+                            className="bg-white rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors cursor-pointer group flex flex-col overflow-hidden hover:shadow-sm"
                         >
-                            <div className="p-6 flex items-start justify-between">
+                            <div className="p-5 flex items-start justify-between">
                                 <div className="flex gap-4">
                                     {/* Avatar */}
                                     <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 overflow-hidden">
@@ -145,7 +185,7 @@ const Clients: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="px-6 pb-6 space-y-2 flex-1">
+                            <div className="px-5 pb-5 space-y-2 flex-1">
                                 <div className="flex items-center gap-3 text-sm text-zinc-600">
                                     <Mail size={14} className="text-zinc-400" />
                                     <span className="truncate">{client.email}</span>
@@ -160,12 +200,24 @@ const Clients: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between">
+                            <div className="px-5 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between">
                                 <div className="text-xs text-zinc-500">
                                     Last Order: <span className="font-medium text-zinc-900">{client.lastOrderDate || '-'}</span>
                                 </div>
-                                <div className="text-zinc-400 group-hover:text-zinc-900 transition-colors">
-                                    <ArrowUpRight size={16} />
+                                <div className="flex gap-2 items-center">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setClientToDelete(client);
+                                            setIsDeleteModalOpen(true);
+                                        }}
+                                        className="text-zinc-400 hover:text-red-500 transition-colors p-1"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <div className="text-zinc-400 group-hover:text-zinc-900 transition-colors p-1">
+                                        <ArrowUpRight size={16} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -176,6 +228,18 @@ const Clients: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="Delete Client"
+                message={`Are you sure you want to delete ${clientToDelete?.name}? This action cannot be undone and will permanently remove all associated records.`}
+                confirmText="Delete Client"
+                onConfirm={handleDeleteClient}
+                onCancel={() => {
+                    setIsDeleteModalOpen(false);
+                    setClientToDelete(null);
+                }}
+            />
         </div>
     );
 };

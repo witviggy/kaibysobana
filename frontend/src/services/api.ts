@@ -181,6 +181,31 @@ export const api = {
     return handleResponse(res);
   },
 
+  getUsers: async () => {
+    const res = await fetch(`${API_URL}/users`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  createUser: async (data: { name: string; email: string; password: string; role: string }) => {
+    const res = await fetch(`${API_URL}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(res);
+  },
+
+  changePassword: async (userId: number, data: { currentPassword?: string; newPassword: string }) => {
+    const res = await fetch(`${API_URL}/users/${userId}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(res);
+  },
+
   deleteClient: async (id: string) => {
     const res = await fetch(`${API_URL}/clients/${id}`, {
       method: 'DELETE',
@@ -227,6 +252,24 @@ export const api = {
   },
 
   // --- Auth ---
+  login: async (email: string, password: string) => {
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    return handleResponse(res);
+  },
+
+  register: async (name: string, email: string, password: string) => {
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    });
+    return handleResponse(res);
+  },
+
   getCurrentUser: async () => {
     const token = getAuthToken();
     if (!token) throw new Error("Not authenticated");
@@ -238,14 +281,12 @@ export const api = {
       }
     });
     if (res.status === 401) {
-      // Token invalid, remove it
       localStorage.removeItem('auth_token');
       throw new Error("Not authenticated");
     }
     return handleResponse(res);
   },
   logout: async () => {
-    // Remove token from localStorage
     localStorage.removeItem('auth_token');
     return { success: true };
   },

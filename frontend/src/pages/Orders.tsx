@@ -6,14 +6,15 @@ import { api } from '../services/api';
 import { OrderStatus } from '../types';
 import { SkeletonLine } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { useSearch } from '../context/SearchContext';
 
 const Orders: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
     const [orders, setOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('All');
+    const { globalSearchQuery: searchQuery } = useSearch();
+    const [statusFilter, setStatusFilter] = useState('All');
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -30,15 +31,27 @@ const Orders: React.FC = () => {
         fetchOrders();
     }, [addToast]);
 
+    const matchesSearch = (text: string | undefined, query: string) => {
+        if (!text || !query) return false;
+        const lowerText = text.toString().toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        return lowerText.startsWith(lowerQuery) || lowerText.split(/\s+/).some(word => word.startsWith(lowerQuery));
+    };
+
     const filteredOrders = orders.filter(order => {
         const query = searchQuery.toLowerCase();
-        const matchesSearch =
-            order.id.toLowerCase().includes(query) ||
-            order.clientName.toLowerCase().includes(query) ||
-            (order.dressName && order.dressName.toLowerCase().includes(query)) ||
-            (order.fabricName && order.fabricName.toLowerCase().includes(query));
+
+        let matchesQuery = true;
+        if (searchQuery) {
+            matchesQuery =
+                matchesSearch(order.id, searchQuery) ||
+                matchesSearch(order.clientName, searchQuery) ||
+                matchesSearch(order.dressName, searchQuery) ||
+                matchesSearch(order.fabricName, searchQuery);
+        }
+
         const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        return matchesQuery && matchesStatus;
     });
 
     const handleExport = () => {
@@ -98,7 +111,7 @@ const Orders: React.FC = () => {
                         <Download size={16} /> Export
                     </button>
                     <button
-                        onClick={() => navigate('/clients/new-order')}
+                        onClick={() => navigate('/orders/new-order')}
                         className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-all shadow-sm"
                     >
                         <Plus size={16} /> Create Order
@@ -123,20 +136,6 @@ const Orders: React.FC = () => {
                         </button>
                     );
                 })}
-            </div>
-
-            {/* Search */}
-            <div className="flex gap-4">
-                <div className="relative flex-1 max-w-lg">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search by order ID, client name..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 rounded-md bg-white border border-zinc-200 text-sm focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all placeholder:text-zinc-400"
-                    />
-                </div>
             </div>
 
             {/* Orders Table */}
@@ -218,7 +217,7 @@ const Orders: React.FC = () => {
                     <div className="p-12 text-center text-zinc-500">
                         <p className="text-sm">No orders found.</p>
                         <button
-                            onClick={() => navigate('/clients/new-order')}
+                            onClick={() => navigate('/orders/new-order')}
                             className="mt-4 text-sm font-medium text-zinc-900 underline hover:text-black"
                         >
                             Create Order

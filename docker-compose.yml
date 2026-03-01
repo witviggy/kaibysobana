@@ -29,26 +29,6 @@ services:
     networks:
       - stitchflow-network
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0
-    container_name: stitchflow_keycloak
-    environment:
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak}
-      - KC_DB_USERNAME=${POSTGRES_USER:-postgres}
-      - KC_DB_PASSWORD=${POSTGRES_PASSWORD:-password}
-    volumes:
-      - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm-config.json
-    command: start-dev --import-realm
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    networks:
-      - stitchflow-network
-
   backend:
     build: ./backend
     container_name: stitchflow_backend
@@ -65,8 +45,7 @@ services:
       - PORT=${PORT:-5000}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - BACKEND_URL=${BACKEND_URL:-http://localhost:5000}
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
+      - JWT_SECRET=${JWT_SECRET:-kai_dev_jwt_secret_key_change_in_production}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -83,9 +62,6 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_URL=${BACKEND_URL:-http://localhost:5000}/api
-      - VITE_KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
-      - VITE_KEYCLOAK_REALM=${KEYCLOAK_REALM:-kai}
-      - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-kai-frontend}
     volumes:
       - ./frontend:/app
       - /app/node_modules

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, Package, Trash2, X } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 interface CalendarEvent {
     id: string;
@@ -22,6 +23,7 @@ const Calendar: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<any>(null);
 
     // Form State
@@ -150,15 +152,13 @@ const Calendar: React.FC = () => {
 
     const handleDeleteEvent = async () => {
         if (!editingEvent) return;
-        if (confirm("Are you sure you want to delete this event?")) {
-            try {
-                await api.deleteEvent(editingEvent.id);
-                addToast("Event deleted", 'success');
-                setIsModalOpen(false);
-                fetchData();
-            } catch (error) {
-                addToast("Failed to delete event", 'error');
-            }
+        try {
+            await api.deleteEvent(editingEvent.id);
+            addToast("Event deleted", 'success');
+            setIsModalOpen(false);
+            fetchData();
+        } catch (error) {
+            addToast("Failed to delete event", 'error');
         }
     };
 
@@ -169,7 +169,7 @@ const Calendar: React.FC = () => {
 
         // Empty cells for previous month
         for (let i = 0; i < startDay; i++) {
-            days.push(<div key={`empty-${i}`} className="min-h-[60px] bg-zinc-50/30 border-b border-r border-zinc-100" />);
+            days.push(<div key={`empty-${i}`} className="min-h-[100px] bg-zinc-50/30 border-b border-r border-zinc-100" />);
         }
 
         // Days of current month
@@ -182,7 +182,7 @@ const Calendar: React.FC = () => {
                 <div
                     key={i}
                     onClick={() => handleDateClick(i)}
-                    className={`min-h-[60px] border-b border-r border-zinc-100 p-1.5 transition-colors hover:bg-zinc-50 cursor-pointer relative group flex flex-col ${isToday ? 'bg-zinc-50' : 'bg-white'}`}
+                    className={`min-h-[100px] border-b border-r border-zinc-100 p-2 transition-colors hover:bg-zinc-50 cursor-pointer relative group flex flex-col ${isToday ? 'bg-zinc-50' : 'bg-white'}`}
                 >
                     <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-zinc-900 bg-zinc-200 w-6 h-6 rounded-full flex items-center justify-center' : 'text-zinc-500'}`}>
                         {i}
@@ -216,32 +216,32 @@ const Calendar: React.FC = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto h-full flex flex-col pb-4">
+        <div className="max-w-7xl mx-auto h-full flex flex-col pb-4 px-4 sm:px-6 lg:px-8">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-2xl font-semibold text-zinc-900 flex items-center gap-2">
-                        <CalendarIcon className="text-zinc-400" /> Calendar
-                    </h1>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <h1 className="text-2xl font-semibold text-zinc-900 flex items-center gap-2">
+                    <CalendarIcon className="text-zinc-400" /> Calendar
+                </h1>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="flex items-center bg-white border border-zinc-200 rounded-md shadow-sm">
-                        <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-zinc-50"><ChevronLeft size={20} className="text-zinc-600" /></button>
-                        <span className="px-4 py-1.5 font-medium text-zinc-900 min-w-[140px] text-center border-x border-zinc-200">
-                            {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                        <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-zinc-50"><ChevronLeft size={18} className="text-zinc-600" /></button>
+                        <span className="px-3 py-1 font-medium text-zinc-900 min-w-[120px] text-center border-x border-zinc-200 text-sm">
+                            {currentDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
                         </span>
-                        <button onClick={() => changeMonth(1)} className="p-1.5 hover:bg-zinc-50"><ChevronRight size={20} className="text-zinc-600" /></button>
+                        <button onClick={() => changeMonth(1)} className="p-1.5 hover:bg-zinc-50"><ChevronRight size={18} className="text-zinc-600" /></button>
                     </div>
+                    <button
+                        onClick={() => {
+                            setSelectedDate(new Date());
+                            setEditingEvent(null);
+                            setEventForm({ title: '', description: '', type: 'reminder', time: '12:00' });
+                            setIsModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-colors shrink-0"
+                    >
+                        <Plus size={14} /> New Event
+                    </button>
                 </div>
-                <button
-                    onClick={() => {
-                        setSelectedDate(new Date());
-                        setEditingEvent(null);
-                        setEventForm({ title: '', description: '', type: 'reminder', time: '12:00' });
-                        setIsModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-colors"
-                >
-                    <Plus size={16} /> New Event
-                </button>
             </div>
 
             {/* Calendar Grid */}
@@ -255,7 +255,7 @@ const Calendar: React.FC = () => {
                     ))}
                 </div>
                 {/* Days */}
-                <div className="grid grid-cols-7 grid-rows-6 flex-1">
+                <div className="grid grid-cols-7 flex-1">
                     {renderCalendarDays()}
                 </div>
             </div>
@@ -330,7 +330,7 @@ const Calendar: React.FC = () => {
                                 {editingEvent && !editingEvent.isOrder && (
                                     <button
                                         type="button"
-                                        onClick={handleDeleteEvent}
+                                        onClick={() => setIsDeleteModalOpen(true)}
                                         className="flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                     >
                                         <Trash2 size={18} />
@@ -358,6 +358,15 @@ const Calendar: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={isDeleteModalOpen}
+                title="Delete Event"
+                message="Are you sure you want to delete this event? This action cannot be undone."
+                confirmText="Delete Event"
+                onConfirm={handleDeleteEvent}
+                onCancel={() => setIsDeleteModalOpen(false)}
+            />
         </div>
     );
 };

@@ -4,6 +4,26 @@ import { IndianRupee, TrendingUp, TrendingDown, Download, Calendar, Activity, Ar
 import { api } from '../services/api';
 import { SkeletonLine, SkeletonCard } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
+import { TimeFilter } from '../components/TimeFilter';
+
+const KpiCard = ({ title, value, icon: Icon, delay = 0 }: any) => {
+    return (
+        <div
+            className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm"
+            style={{ animationDelay: `${delay}ms` }}
+        >
+            <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
+                    <Icon size={18} />
+                </div>
+                <div>
+                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">{title}</p>
+                    <p className="text-xl font-semibold text-zinc-900">{value}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const Financials: React.FC = () => {
     const { addToast } = useToast();
@@ -84,6 +104,10 @@ const Financials: React.FC = () => {
         });
 
         return Array.from(dataMap.values())
+            .map(entry => ({
+                ...entry,
+                margin: entry.revenue > 0 ? (entry.profit / entry.revenue) * 100 : 0
+            }))
             .sort((a, b) => a.sortKey - b.sortKey);
     };
 
@@ -149,19 +173,7 @@ const Financials: React.FC = () => {
                     <p className="text-zinc-500 text-sm mt-1">Track revenue and expenses.</p>
                 </div>
                 <div className="flex gap-3">
-                    <div className="relative">
-                        <select
-                            value={timeRange}
-                            onChange={(e) => setTimeRange(e.target.value)}
-                            className="pl-8 pr-4 py-1.5 bg-white border border-zinc-200 text-zinc-700 rounded-md text-sm font-medium hover:bg-zinc-50 transition-colors shadow-sm focus:outline-none focus:ring-1 focus:ring-zinc-300 cursor-pointer appearance-none"
-                        >
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                            <option value="6m">Last 6 Months</option>
-                            <option value="1y">Last Year</option>
-                        </select>
-                        <Calendar size={14} className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-zinc-500 pointer-events-none" />
-                    </div>
+                    <TimeFilter value={timeRange} onChange={setTimeRange} />
                     <button
                         onClick={handleExport}
                         className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-colors shadow-sm"
@@ -173,57 +185,30 @@ const Financials: React.FC = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
-                            <IndianRupee size={18} />
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                            <ArrowUpRight size={12} /> 12.5%
-                        </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Revenue</p>
-                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">₹{totalRevenue.toLocaleString()}</h3>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
-                            <TrendingUp size={18} />
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                            <ArrowUpRight size={12} /> 8.2%
-                        </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Net Profit</p>
-                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">₹{totalProfit.toLocaleString()}</h3>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
-                            <TrendingDown size={18} />
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
-                            <ArrowUpRight size={12} /> 2.4%
-                        </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Total Expenses</p>
-                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">₹{totalCost.toLocaleString()}</h3>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="p-1.5 bg-zinc-100 rounded text-zinc-600">
-                            <Activity size={18} />
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                            <ArrowUpRight size={12} /> 1.2%
-                        </div>
-                    </div>
-                    <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">Profit Margin</p>
-                    <h3 className="text-xl font-semibold text-zinc-900 mt-0.5">{avgMargin.toFixed(1)}%</h3>
-                </div>
+                <KpiCard
+                    title="Total Revenue"
+                    value={`₹${totalRevenue.toLocaleString()}`}
+                    icon={IndianRupee}
+                    delay={0}
+                />
+                <KpiCard
+                    title="Net Profit"
+                    value={`₹${totalProfit.toLocaleString()}`}
+                    icon={TrendingUp}
+                    delay={100}
+                />
+                <KpiCard
+                    title="Total Expenses"
+                    value={`₹${totalCost.toLocaleString()}`}
+                    icon={TrendingDown}
+                    delay={200}
+                />
+                <KpiCard
+                    title="Profit Margin"
+                    value={`${avgMargin.toFixed(1)}%`}
+                    icon={Activity}
+                    delay={300}
+                />
             </div>
 
             {/* Charts Grid */}
@@ -330,6 +315,37 @@ const Financials: React.FC = () => {
                     )}
                 </div>
             )}
+
+            {/* Profit Margin Trend Chart */}
+            <div className="bg-white p-6 rounded-lg border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-base font-semibold text-zinc-900">Profit Margin Trend</h2>
+                        <p className="text-xs text-zinc-500">Average margin over time</p>
+                    </div>
+                </div>
+                <div className="h-[250px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} dy={10} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} tickFormatter={(value) => `${value}%`} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e4e4e7', boxShadow: 'none', padding: '8px 12px' }}
+                                itemStyle={{ fontSize: '12px', fontWeight: 500 }}
+                                formatter={(value: number) => [`${value.toFixed(1)}%`, 'Margin']}
+                            />
+                            <Area type="monotone" dataKey="margin" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorMargin)" name="Margin" />
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
         </div>
     );
 };

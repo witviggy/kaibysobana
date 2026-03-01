@@ -19,29 +19,24 @@ import { ComposedChart, Area, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { OrderStatus } from '../types';
 import { api } from '../services/api';
 import { SkeletonCard, SkeletonLine } from '../components/Skeleton';
+import { TimeFilter } from '../components/TimeFilter';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 
-const KpiCard = ({ title, value, trend, trendValue, icon: Icon, delay }: any) => {
-  const isPositive = trend === 'up';
-
+const KpiCard = ({ title, value, icon: Icon, delay }: any) => {
   return (
     <div
-      className="bg-white p-4 rounded-lg border border-zinc-200 hover:border-zinc-300 transition-colors shadow-sm"
+      className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="flex justify-between items-start mb-3">
-        <div className="p-1.5 rounded-md bg-zinc-100 text-zinc-900">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-zinc-500">
           <Icon size={18} />
         </div>
-        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${title === 'Active Orders' && !isPositive ? 'bg-emerald-50 text-emerald-700' : isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-          {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-          {trendValue}
+        <div>
+          <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">{title}</p>
+          <p className="text-xl font-semibold text-zinc-900">{value}</p>
         </div>
-      </div>
-      <div>
-        <h3 className="text-xl font-semibold text-zinc-900 tracking-tight mb-0.5">{value}</h3>
-        <p className="text-xs text-zinc-500">{title}</p>
       </div>
     </div>
   );
@@ -53,7 +48,7 @@ const Dashboard: React.FC = () => {
   const { user: authUser } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('7d');
+  const [timeRange, setTimeRange] = useState('6m');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -107,7 +102,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const { user, revenue, profit, activeOrders, chartData, statusData, lowStockFabrics, recentOrders } = stats;
+  const { user, revenue, profit, activeOrders, statusData, lowStockFabrics, recentOrders, fabricUsageData, chartData } = stats;
   const avgMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
 
   const handleExport = () => {
@@ -117,9 +112,9 @@ const Dashboard: React.FC = () => {
         { Metric: 'Net Profit', Value: profit },
         { Metric: 'Active Orders', Value: activeOrders },
         { Metric: 'Avg Margin', Value: `${avgMargin.toFixed(1)}%` },
-        ...chartData.map((d: any) => ({
-          Metric: `Trend (${d.name})`,
-          Value: `Rev: ${d.revenue}, Prof: ${d.profit}`
+        ...(fabricUsageData || []).map((d: any) => ({
+          Metric: `Top Fabric (${d.name})`,
+          Value: `${d.amount} used`
         }))
       ];
       downloadCSV(exportData, `Dashboard_Summary_${new Date().toISOString().split('T')[0]}`);
@@ -140,17 +135,12 @@ const Dashboard: React.FC = () => {
           <p className="text-zinc-500 text-sm mt-1">Here's what's happening today.</p>
         </div>
         <div className="flex items-center gap-3">
+          <TimeFilter value={timeRange} onChange={setTimeRange} />
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 text-zinc-700 rounded-md text-sm font-medium hover:bg-zinc-50 transition-all shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border border-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-black transition-colors shadow-sm"
           >
-            <Download size={16} /> Export
-          </button>
-          <button
-            onClick={() => navigate('/clients/new-order')}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-all shadow-sm"
-          >
-            <Plus size={16} /> New Order
+            <Download size={14} /> Export
           </button>
         </div>
       </div>
@@ -160,32 +150,24 @@ const Dashboard: React.FC = () => {
         <KpiCard
           title="Total Revenue"
           value={`₹${revenue.toLocaleString()}`}
-          trend="up"
-          trendValue="12.5%"
           icon={IndianRupee}
           delay={0}
         />
         <KpiCard
           title="Net Profit"
           value={`₹${profit.toLocaleString()}`}
-          trend="up"
-          trendValue="8.2%"
           icon={TrendingUp}
           delay={100}
         />
         <KpiCard
           title="Active Orders"
           value={activeOrders}
-          trend="down"
-          trendValue="2.1%"
           icon={ShoppingBag}
           delay={200}
         />
         <KpiCard
           title="Avg. Margin"
           value={`${avgMargin.toFixed(1)}%`}
-          trend="up"
-          trendValue="1.2%"
           icon={Activity}
           delay={300}
         />
@@ -195,73 +177,36 @@ const Dashboard: React.FC = () => {
       {(stats.user?.preferences?.dashboard?.revenueChart?.show !== false || stats.user?.preferences?.dashboard?.statusPie?.show !== false) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Revenue Trends */}
-          {stats.user?.preferences?.dashboard?.revenueChart?.show !== false && (
-            <div className={`${stats.user?.preferences?.dashboard?.statusPie?.show === false ? 'lg:col-span-3' : 'lg:col-span-2'} bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-shadow hover:shadow-md`}>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-base font-semibold text-zinc-900">Revenue Trends</h2>
-                  <p className="text-xs text-zinc-500">Income vs Profit (7 Days)</p>
-                </div>
-                <select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                  className="text-xs bg-zinc-50 border border-zinc-200 rounded px-3 py-1 text-zinc-700 outline-none focus:border-zinc-400 cursor-pointer"
-                >
-                  <option value="7d">Last 7 Days</option>
-                  <option value="30d">Last 30 Days</option>
-                  <option value="6m">Last 6 Months</option>
-                  <option value="1y">Last Year</option>
-                </select>
+          {/* Orders Volume Chart */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-shadow hover:shadow-md">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-900">Orders Volume</h2>
+                <p className="text-xs text-zinc-500">Number of orders </p>
               </div>
-              <div className="h-[300px]">
+            </div>
+            <div className="h-[300px]">
+              {chartData && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} /> {/* Emerald-500 */}
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} /> {/* Blue-500 */}
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f4f4f5" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e4e4e7', boxShadow: 'none', padding: '8px 12px' }}
                       itemStyle={{ fontSize: '12px', fontWeight: 500 }}
-                      cursor={{ stroke: '#e4e4e7' }}
-                      formatter={(value: number) => `₹${value.toLocaleString()}`}
+                      cursor={{ fill: '#f4f4f5' }}
                     />
-
-                    {(!stats.user?.preferences?.dashboard?.revenueChart?.type || stats.user?.preferences?.dashboard?.revenueChart?.type === 'area') && (
-                      <>
-                        <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" name="Revenue" />
-                        <Area type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorProfit)" name="Profit" />
-                      </>
-                    )}
-
-                    {stats.user?.preferences?.dashboard?.revenueChart?.type === 'bar' && (
-                      <>
-                        <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} name="Revenue" />
-                        <Bar dataKey="profit" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Profit" />
-                      </>
-                    )}
-
-                    {stats.user?.preferences?.dashboard?.revenueChart?.type === 'line' && (
-                      <>
-                        <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="Revenue" />
-                        <Line type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="Profit" />
-                      </>
-                    )}
+                    <Bar yAxisId="left" dataKey="volume" fill="#10b981" radius={[4, 4, 0, 0]} barSize={32} name="Orders" />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-zinc-400">
+                  No order data available
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Production Status */}
           {stats.user?.preferences?.dashboard?.statusPie?.show !== false && (
@@ -311,9 +256,40 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Top Fabrics Chart */}
+          <div className="lg:col-span-3 bg-white p-6 rounded-lg border border-zinc-200 shadow-sm transition-shadow hover:shadow-md">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-900">Top Fabrics Used</h2>
+                <p className="text-xs text-zinc-500">Based on orders </p>
+              </div>
+            </div>
+            <div className="h-[300px]">
+              {fabricUsageData && fabricUsageData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={fabricUsageData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f4f4f5" />
+                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" width={100} axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #e4e4e7', boxShadow: 'none', padding: '8px 12px' }}
+                      itemStyle={{ fontSize: '12px', fontWeight: 500 }}
+                      cursor={{ fill: '#f4f4f5' }}
+                      formatter={(value: number) => [`${value} units`, 'Used']}
+                    />
+                    <Bar dataKey="amount" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} name="Used" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-zinc-400">
+                  No fabric data available
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      )
-      }
+      )}
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

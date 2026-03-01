@@ -1,12 +1,9 @@
--- Create Keycloak database (for Keycloak auth service)
-CREATE DATABASE keycloak;
-
 -- Create Users Table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    keycloak_id VARCHAR(255),
+    password_hash VARCHAR(255),
     nickname VARCHAR(255),
     role VARCHAR(50) DEFAULT 'Admin',
     avatar_url TEXT,
@@ -83,9 +80,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 -- Seed Data (Dynamic Dates)
 
--- Users
-INSERT INTO users (id, name, email, avatar_url) VALUES 
-(1, 'Olivia Rhye', 'olivia@stitchflow.com', 'https://picsum.photos/id/64/100/100');
+-- Users (password: admin123)
+INSERT INTO users (id, name, email, password_hash, avatar_url) VALUES 
+(1, 'Olivia Rhye', 'admin@kai.com', '$2b$10$TdVO/JjT35ILdnUsw4Ntg.gb80QG6IEAabCWJUpJqMrnaapU8HxXe', 'https://picsum.photos/id/64/100/100');
 
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
@@ -110,13 +107,6 @@ INSERT INTO fabrics (id, name, color, meters_available, meters_per_outfit, price
 SELECT setval('fabrics_id_seq', (SELECT MAX(id) FROM fabrics));
 
 -- Orders (Dynamic Dates)
--- ord-1024: 1 month ago
--- ord-1023: 15 days ago
--- ord-1022: 4 days ago
--- ord-1021: 2 months ago
--- ord-1020: 3 days ago
--- ord-1019: Today
-
 INSERT INTO orders (id, client_id, fabric_id, quantity, order_date, delivery_date, status, dress_name, fabric_required, selling_price, stitching_cost, fabric_cost, courier_cost_from_me, courier_cost_to_me) VALUES 
 ('ord-1024', 1, 1, 50, NOW() - INTERVAL '30 days', NOW() - INTERVAL '20 days', 'In Progress', 'Summer Dress', 1.5, 1800.00, 500.00, 600.00, 50.00, 50.00),
 ('ord-1023', 3, 4, 20, NOW() - INTERVAL '15 days', NOW() - INTERVAL '5 days', 'Completed', 'Linen Shirt', 1.2, 850.00, 200.00, 200.00, 50.00, 50.00),

@@ -6,20 +6,14 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 require('dotenv').config();
-const session = require('express-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Validate critical environment variables
-const requiredEnvVars = ['DATABASE_URL', 'DB_HOST', 'FRONTEND_URL', 'BACKEND_URL', 'KEYCLOAK_URL'];
-// Check either DATABASE_URL or DB_HOST
-if (!process.env.DATABASE_URL && !process.env.DB_HOST) {
-  console.warn("⚠️  WARNING: Database configuration missing (DATABASE_URL or DB_HOST)");
-}
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'kai_dev_jwt_secret_key_change_in_production';
 
 const path = require('path');
 const multer = require('multer');
@@ -51,37 +45,26 @@ if (isProduction) {
 }
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Keep dev fallback for local dev convenience
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());
 
-// Session Config - Cross-origin compatible
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'stitchflow_secret_key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: isProduction,           // HTTPS only in production
-    httpOnly: true,                 // Prevent XSS
-    sameSite: isProduction ? 'none' : 'lax',  // Allow cross-origin in production
-    maxAge: 24 * 60 * 60 * 1000    // 24 hours
-  }
-}));
-
-// Passport Config
-app.use(passport.initialize());
-app.use(passport.session());
-
 // Database Connection
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+console.log('🔗 BACKEND_URL:', BACKEND_URL);
+console.log('🔗 FRONTEND_URL:', FRONTEND_URL);
+
 const poolConfig = process.env.DATABASE_URL
   ? {
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } // Required for Supabase/Render/Neon
+    ssl: { rejectUnauthorized: false }
   }
   : {
     user: process.env.DB_USER || 'postgres',
-    host: process.env.DB_HOST, // No fallback to localhost in production ideally, but keeping strict env usage
+    host: process.env.DB_HOST,
     database: process.env.DB_NAME || 'stitchflow',
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT || 5432,
@@ -89,65 +72,7 @@ const poolConfig = process.env.DATABASE_URL
 
 const pool = new Pool(poolConfig);
 
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser(async (id, done) => {
-  try {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    done(null, result.rows[0]);
-  } catch (err) {
-    done(err, null);
-  }
-});
-
-// Google Strategy
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "placeholder_id";
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "placeholder_secret";
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-console.log('🔗 BACKEND_URL:', BACKEND_URL);
-console.log('🔗 FRONTEND_URL:', FRONTEND_URL);
-
-if (!process.env.GOOGLE_CLIENT_ID) {
-  console.warn("⚠️  WARNING: GOOGLE_CLIENT_ID is missing using placeholder to prevent crash.");
-}
-
-passport.use(new GoogleStrategy({
-  clientID: GOOGLE_CLIENT_ID,
-  clientSecret: GOOGLE_CLIENT_SECRET,
-  callbackURL: `${BACKEND_URL}/auth/google/callback`
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // Check if user exists
-    const existingUser = await pool.query('SELECT * FROM users WHERE google_id = $1 OR email = $2', [profile.id, profile.emails[0].value]);
-
-    if (existingUser.rows.length > 0) {
-      // Update google_id if matched by email but no google_id yet
-      if (!existingUser.rows[0].google_id) {
-        await pool.query('UPDATE users SET google_id = $1, avatar_url = $2 WHERE id = $3',
-          [profile.id, profile.photos[0].value, existingUser.rows[0].id]);
-        return done(null, { ...existingUser.rows[0], google_id: profile.id, avatar_url: profile.photos[0].value });
-      }
-      return done(null, existingUser.rows[0]);
-    }
-
-    // Create new user
-    const newUser = await pool.query(
-      'INSERT INTO users (name, email, google_id, avatar_url, preferences) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [profile.displayName, profile.emails[0].value, profile.id, profile.photos[0].value, '{}']
-    );
-    return done(null, newUser.rows[0]);
-  } catch (err) {
-    return done(err, null);
-  }
-}));
-
-
-// Auto-Migration Helper to ensure columns exist (User requested new features)
-// Auto-Migration Helper to ensure columns exist (User requested new features)
+// Auto-Migration Helper to ensure columns exist
 const migrateSchema = async () => {
   const runQuery = async (query, label) => {
     try {
@@ -162,17 +87,17 @@ const migrateSchema = async () => {
   await runQuery(`
         ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname VARCHAR(255);
         ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}';
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
         ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-    `, "User Columns (Nickname, Prefs, GoogleID)");
+    `, "User Columns (Nickname, Prefs, PasswordHash)");
 
   // 2. Create Activity Logs Table
   await runQuery(`
         CREATE TABLE IF NOT EXISTS activity_logs (
             id SERIAL PRIMARY KEY,
-            user_id INT, -- Nullable for now
-            action VARCHAR(50) NOT NULL, -- CREATE, UPDATE, DELETE
-            entity_type VARCHAR(50) NOT NULL, -- CLIENT, ORDER, FABRIC
+            user_id INT,
+            action VARCHAR(50) NOT NULL,
+            entity_type VARCHAR(50) NOT NULL,
             entity_id VARCHAR(50),
             details JSONB,
             created_at TIMESTAMP DEFAULT NOW()
@@ -184,6 +109,11 @@ const migrateSchema = async () => {
         ALTER TABLE fabrics ADD COLUMN IF NOT EXISTS image_url TEXT;
     `, "Fabric Image Column");
 
+  // 3b. Add image_url to products
+  await runQuery(`
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;
+    `, "Product Image Column");
+
   // 4. Create Events Table (Calendar)
   await runQuery(`
         CREATE TABLE IF NOT EXISTS events (
@@ -191,7 +121,7 @@ const migrateSchema = async () => {
             title VARCHAR(255) NOT NULL,
             description TEXT,
             event_date TIMESTAMP NOT NULL,
-            type VARCHAR(50) DEFAULT 'reminder', -- reminder, deadline, meeting
+            type VARCHAR(50) DEFAULT 'reminder',
             created_at TIMESTAMP DEFAULT NOW()
         );
     `, "Events Table");
@@ -213,8 +143,8 @@ const migrateSchema = async () => {
         CREATE TABLE IF NOT EXISTS order_items (
             id SERIAL PRIMARY KEY,
             order_id VARCHAR(50) REFERENCES orders(id) ON DELETE CASCADE,
-            product_id INTEGER REFERENCES products(id), -- Optional link to catalog
-            dress_name VARCHAR(255), -- Snapshot name
+            product_id INTEGER REFERENCES products(id),
+            dress_name VARCHAR(255),
             fabric_id INTEGER REFERENCES fabrics(id),
             quantity INTEGER DEFAULT 1,
             size_chart VARCHAR(10),
@@ -226,14 +156,19 @@ const migrateSchema = async () => {
         );
     `, "Order Items Table");
 
-  // 7. Make orders columns nullable for transition (if they aren't already)
-  // We won't do this automatically to avoid risk, but new orders will fill dummy data 
-  // or we update schema to allow nulls. For now, we will fill the "Main" order fields 
-  // with the sums/first-item details to maintain backward compatibility.
+  // 7. Seed default admin if no users exist
+  await runQuery(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM users LIMIT 1) THEN
+        INSERT INTO users (name, email, password_hash, avatar_url)
+        VALUES ('Admin', 'admin@kai.com', '$2b$10$TdVO/JjT35ILdnUsw4Ntg.gb80QG6IEAabCWJUpJqMrnaapU8HxXe', 'https://picsum.photos/id/64/100/100');
+      END IF;
+    END $$;
+  `, "Seed default admin user");
 
   console.log("Schema migration check complete.");
 };
-migrateSchema();
 
 // Helper to log activity
 const logActivity = async (action, entityType, entityId, details) => {
@@ -244,15 +179,11 @@ const logActivity = async (action, entityType, entityId, details) => {
     );
   } catch (err) {
     console.error("Failed to log activity:", err.message);
-    // We don't throw here to avoid failing the main request if logging fails, 
-    // but the user wants "every modification tracked", so ideally we should ensure it works.
-    // Proceeding to allow request completion but logging error to server console.
   }
 };
 
-// --- Auth Routes (Keycloak handles authentication) ---
+// --- Auth Middleware ---
 
-// JWT/Keycloak token verification middleware
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -262,92 +193,113 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = decodeKeycloakToken(token);
-    if (!decoded || !decoded.email) {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ message: 'Invalid token' });
+    return res.status(401).json({ message: 'Invalid or expired token' });
   }
 };
 
-// Keycloak configuration
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://localhost:8080';
-const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM || 'kai';
+// --- Auth Routes ---
 
-// Helper to decode JWT (Keycloak tokens are JWTs)
-const decodeKeycloakToken = (token) => {
+// Register
+app.post('/api/auth/register', async (req, res) => {
   try {
-    // In development, we just decode the token without full verification
-    // In production, you should verify against Keycloak's public key
-    const parts = token.split('.');
-    if (parts.length !== 3) throw new Error('Invalid token format');
+    const { name, email, password } = req.body;
 
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-    return payload;
-  } catch (err) {
-    console.error('Token decode error:', err.message);
-    return null;
-  }
-};
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
 
-// Find or create user from Keycloak token
-const findOrCreateUserFromKeycloak = async (tokenPayload) => {
-  const keycloakId = tokenPayload.sub;
-  const email = tokenPayload.email;
-  const name = tokenPayload.name || tokenPayload.preferred_username || email.split('@')[0];
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
 
-  // Try to find existing user by keycloak_id or email
-  let result = await pool.query(
-    'SELECT * FROM users WHERE keycloak_id = $1 OR email = $2',
-    [keycloakId, email]
-  );
+    // Check if user exists
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
 
-  if (result.rows.length > 0) {
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password_hash, preferences) VALUES ($1, $2, $3, $4) RETURNING id, name, email, nickname, avatar_url as "avatarUrl", preferences, role',
+      [name, email, passwordHash, '{}']
+    );
+
     const user = result.rows[0];
-    // Update keycloak_id if not set
-    if (!user.keycloak_id) {
-      await pool.query('UPDATE users SET keycloak_id = $1 WHERE id = $2', [keycloakId, user.id]);
-    }
-    return user;
+
+    // Generate JWT
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    console.log('✅ User registered:', email);
+    res.json({ token, user });
+  } catch (err) {
+    console.error('❌ Register error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
+});
 
-  // Create new user
-  result = await pool.query(
-    'INSERT INTO users (name, email, keycloak_id, preferences) VALUES ($1, $2, $3, $4) RETURNING *',
-    [name, email, keycloakId, '{}']
-  );
-  console.log('✅ Created new user from Keycloak:', email);
-  return result.rows[0];
-};
-
-app.get('/api/auth/me', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'No token provided' });
-  }
-
+// Login
+app.post('/api/auth/login', async (req, res) => {
   try {
-    // Decode Keycloak token
-    const decoded = decodeKeycloakToken(token);
-    if (!decoded || !decoded.email) {
-      return res.status(401).json({ message: 'Invalid token' });
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    console.log('🔐 Keycloak token for:', decoded.email);
+    // Find user
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
 
-    // Find or create user
-    const user = await findOrCreateUserFromKeycloak(decoded);
+    const user = result.rows[0];
 
-    // Fetch fresh user data
+    // Check password
+    if (!user.password_hash) {
+      return res.status(401).json({ message: 'Account has no password set. Please contact admin.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    console.log('✅ User logged in:', email);
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        nickname: user.nickname,
+        avatarUrl: user.avatar_url,
+        preferences: user.preferences,
+        role: user.role
+      }
+    });
+  } catch (err) {
+    console.error('❌ Login error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get current user
+app.get('/api/auth/me', verifyToken, async (req, res) => {
+  try {
     const result = await pool.query(
       `SELECT id, name, email, nickname, avatar_url as "avatarUrl", preferences, role 
        FROM users WHERE id = $1`,
-      [user.id]
+      [req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -362,33 +314,15 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
+// Logout (client-side only, just acknowledge)
 app.post('/api/auth/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) return res.status(500).send(err);
-    res.json({ message: 'Logged out' });
-  });
+  res.json({ message: 'Logged out' });
 });
 
-// Update current user profile (requires Keycloak token)
-app.put('/api/users/me', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'No token provided' });
-  }
-
+// Update current user profile
+app.put('/api/users/me', verifyToken, async (req, res) => {
   try {
-    // Decode Keycloak token
-    const decoded = decodeKeycloakToken(token);
-    if (!decoded || !decoded.email) {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
-
-    // Find or create user from Keycloak
-    const user = await findOrCreateUserFromKeycloak(decoded);
-    const userId = user.id;
-
+    const userId = req.user.id;
     const { name, email, nickname, avatarUrl, preferences } = req.body;
 
     console.log('📝 Updating user:', userId, { name, nickname, avatarUrl: avatarUrl ? 'set' : 'not set' });
@@ -410,9 +344,100 @@ app.put('/api/users/me', async (req, res) => {
     }
 
     console.log('✅ User profile updated:', result.rows[0].email);
+    await logActivity('UPDATE', 'USER', userId, JSON.stringify({ name, nickname }));
     res.json(result.rows[0]);
   } catch (err) {
     console.error('❌ Error updating user:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get all users (admin only)
+app.get('/api/users', verifyToken, async (req, res) => {
+  try {
+    // Check if requesting user is admin
+    const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    const result = await pool.query(
+      `SELECT id, name, email, role, nickname, avatar_url as "avatarUrl", created_at as "createdAt" FROM users ORDER BY created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('❌ Error fetching users:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Create new member (admin only)
+app.post('/api/users', verifyToken, async (req, res) => {
+  try {
+    // Check if requesting user is admin
+    const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+    // Check if user exists
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    const userRole = role === 'admin' ? 'admin' : 'member';
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password_hash, role, preferences) VALUES ($1, $2, $3, $4, '{}') 
+       RETURNING id, name, email, role, nickname, avatar_url as "avatarUrl", created_at as "createdAt"`,
+      [name, email, passwordHash, userRole]
+    );
+    console.log('✅ New member created:', email);
+    await logActivity('CREATE', 'USER', result.rows[0].id, JSON.stringify({ name, email, role: userRole }));
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('❌ Error creating user:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Change password (admin can change any, user can change own)
+app.put('/api/users/:id/password', verifyToken, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.id);
+    const requestingUserId = req.user.id;
+    // Check if admin or self
+    const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [requestingUserId]);
+    const isAdmin = adminCheck.rows.length > 0 && adminCheck.rows[0].role === 'admin';
+    if (!isAdmin && requestingUserId !== targetUserId) {
+      return res.status(403).json({ message: 'Not authorized to change this password' });
+    }
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    // If changing own password (non-admin), require current password
+    if (!isAdmin || requestingUserId === targetUserId) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: 'Current password is required' });
+      }
+      const userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [targetUserId]);
+      if (userResult.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+      const isMatch = await bcrypt.compare(currentPassword, userResult.rows[0].password_hash);
+      if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, targetUserId]);
+    console.log('✅ Password changed for user:', targetUserId);
+    await logActivity('UPDATE', 'USER', targetUserId, 'Password changed');
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('❌ Error changing password:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -481,17 +506,16 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 // 1. Dashboard Stats (Aggregated)
 app.get('/api/dashboard/stats', async (req, res) => {
   try {
-    // Current User (Mock Auth)
+    // Current User
     const userQuery = await pool.query('SELECT * FROM users LIMIT 1');
     const user = userQuery.rows[0];
 
     // Aggregates
     const revenueQuery = await pool.query('SELECT SUM(selling_price) as total FROM orders');
     const profitQuery = await pool.query('SELECT SUM(profit) as total FROM orders');
-    const ordersCount = await pool.query('SELECT COUNT(*) as total FROM orders WHERE status != \'Cancelled\'');
+    const ordersCount = await pool.query("SELECT COUNT(*) as total FROM orders WHERE status != 'Cancelled'");
 
-    // Revenue Trends (Last 7 days)
-    // 0. Time Range Logic
+    // Revenue Trends
     const { range = '7d' } = req.query;
     let interval = "'7 days'";
     let dateFormat = "'Mon DD'";
@@ -507,15 +531,12 @@ app.get('/api/dashboard/stats', async (req, res) => {
       dateFormat = "'Mon YY'";
     }
 
-    // 1. Chart Data (Dynamic)
-    // We use a CTE to generate the series so we don't have gaps, but for simplicity in this iteration:
-    // We just filter. (Gaps might exist if no sales on a day/month).
-    // Improved: Group by the formatted date.
     const chartQuery = await pool.query(`
       SELECT 
         TO_CHAR(order_date, ${dateFormat}) as name,
         SUM(selling_price) as revenue,
-        SUM(profit) as profit
+        SUM(profit) as profit,
+        COUNT(*) as volume
       FROM orders 
       WHERE order_date > NOW() - INTERVAL ${interval}
         AND status != 'Cancelled'
@@ -697,6 +718,23 @@ app.put('/api/clients/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/clients/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Client not found' });
+
+    await logActivity('DELETE', 'CLIENT', id, JSON.stringify({}));
+    res.json({ message: 'Client deleted' });
+  } catch (err) {
+    console.error(err.message);
+    if (err.code === '23503') {
+      return res.status(400).json({ message: 'Cannot delete client with active orders.' });
+    }
+    res.status(500).send('Server Error');
+  }
+});
+
 // 4. Fabrics
 app.get('/api/fabrics', async (req, res) => {
   try {
@@ -706,7 +744,7 @@ app.get('/api/fabrics', async (req, res) => {
         meters_available as "metersAvailable",
         meters_per_outfit as "metersPerOutfit",
         price_per_meter as "pricePerMeter",
-        TO_CHAR(updated_at, 'Mon DD') as "lastUpdated", -- Mocking simpler date
+        TO_CHAR(updated_at, 'Mon DD') as "lastUpdated",
         status,
         image_url as "imageUrl"
       FROM fabrics
@@ -792,6 +830,23 @@ app.patch('/api/fabrics/:id/stock', async (req, res) => {
   }
 });
 
+app.delete('/api/fabrics/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM fabrics WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Fabric not found' });
+
+    await logActivity('DELETE', 'FABRIC', id, JSON.stringify({}));
+    res.json({ message: 'Fabric deleted' });
+  } catch (err) {
+    console.error(err.message);
+    if (err.code === '23503') {
+      return res.status(400).json({ message: 'Cannot delete fabric because it is used in existing orders.' });
+    }
+    res.status(500).send('Server Error');
+  }
+});
+
 // 4.5 Events (Calendar)
 app.get('/api/events', async (req, res) => {
   try {
@@ -821,12 +876,12 @@ app.put('/api/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, eventDate, type } = req.body;
-    const updatedhuman = await pool.query(
+    const updated = await pool.query(
       'UPDATE events SET title = $1, description = $2, event_date = $3, type = $4 WHERE id = $5 RETURNING *',
       [title, description, eventDate, type, id]
     );
-    if (updatedhuman.rows.length === 0) return res.status(404).send('Event not found');
-    res.json(updatedhuman.rows[0]);
+    if (updated.rows.length === 0) return res.status(404).send('Event not found');
+    res.json(updated.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
@@ -848,7 +903,8 @@ app.delete('/api/events/:id', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT p.*, f.name as "defaultFabricName" 
+      SELECT p.*, f.name as "defaultFabricName",
+        p.image_url as "imageUrl"
       FROM products p 
       LEFT JOIN fabrics f ON p.default_fabric_id = f.id 
       ORDER BY p.name ASC
@@ -862,14 +918,14 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, defaultFabricId, basePrice, description } = req.body;
+    const { name, defaultFabricId, basePrice, description, imageUrl } = req.body;
     const newProduct = await pool.query(
-      'INSERT INTO products (name, default_fabric_id, base_price, description) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, defaultFabricId || null, basePrice || 0, description]
+      'INSERT INTO products (name, default_fabric_id, base_price, description, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, defaultFabricId || null, basePrice || 0, description, imageUrl || null]
     );
     res.json(newProduct.rows[0]);
   } catch (err) {
-    if (err.code === '23505') { // Unique violation
+    if (err.code === '23505') {
       return res.status(400).json({ message: 'Product already exists' });
     }
     console.error(err);
@@ -880,10 +936,10 @@ app.post('/api/products', async (req, res) => {
 app.put('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, defaultFabricId, basePrice, description } = req.body;
+    const { name, defaultFabricId, basePrice, description, imageUrl } = req.body;
     const updated = await pool.query(
-      'UPDATE products SET name = $1, default_fabric_id = $2, base_price = $3, description = $4 WHERE id = $5 RETURNING *',
-      [name, defaultFabricId || null, basePrice || 0, description, id]
+      'UPDATE products SET name = $1, default_fabric_id = $2, base_price = $3, description = $4, image_url = $5 WHERE id = $6 RETURNING *',
+      [name, defaultFabricId || null, basePrice || 0, description, imageUrl || null, id]
     );
     res.json(updated.rows[0]);
   } catch (err) {
@@ -971,11 +1027,9 @@ app.post('/api/orders', async (req, res) => {
     const {
       id, clientId, status,
       orderDate, deliveryDate,
-      // Aggregates for main table (kept for backward compat & analytics)
       sellingPrice, stitchingCost, fabricCost, courierCostFromMe, courierCostToMe,
       remarks,
-      // New Items Array
-      items // Array of { dressName, fabricId, quantity, size, fabricRequired, fabricCost, stitchingCost, sellingPrice }
+      items
     } = req.body;
 
     // Start Transaction
@@ -994,7 +1048,6 @@ app.post('/api/orders', async (req, res) => {
         id, clientId, orderDate, deliveryDate, status,
         sellingPrice, stitchingCost, fabricCost, courierCostFromMe || 0, courierCostToMe || 0,
         remarks,
-        // Legacy/Defaults
         items && items.length > 0 ? items[0].fabricId : null,
         items ? items.reduce((sum, i) => sum + i.quantity, 0) : 0,
         items && items.length > 0 ? items[0].dressName : 'Multi-Item Order',
@@ -1006,7 +1059,6 @@ app.post('/api/orders', async (req, res) => {
     // 2. Process Items
     if (items && items.length > 0) {
       for (const item of items) {
-        // A. Insert Item
         await pool.query(
           `INSERT INTO order_items(
             order_id, dress_name, fabric_id, quantity, size_chart, fabric_required, 
@@ -1018,13 +1070,9 @@ app.post('/api/orders', async (req, res) => {
           ]
         );
 
-        // B. Deduct Stock
         let deduction = 0;
         if (item.fabricRequired && item.fabricRequired > 0) {
           deduction = item.fabricRequired;
-        } else {
-          // Fallback lookup if needed, but for now rely on input
-          deduction = 0;
         }
 
         if (deduction > 0 && item.fabricId) {
@@ -1042,72 +1090,10 @@ app.post('/api/orders', async (req, res) => {
       [clientId]
     );
 
-
     await pool.query('COMMIT');
     res.json(newOrder.rows[0]);
   } catch (err) {
     await pool.query('ROLLBACK');
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
-
-// --- Routes ---
-
-// 1. Dashboard Stats (Aggregated)
-app.get('/api/dashboard/stats', async (req, res) => {
-  try {
-    // Current User (Mock Auth)
-    const userQuery = await pool.query('SELECT * FROM users LIMIT 1');
-    const user = userQuery.rows[0];
-
-    // Aggregates
-    const revenueQuery = await pool.query('SELECT SUM(selling_price) as total FROM orders');
-    const profitQuery = await pool.query('SELECT SUM(profit) as total FROM orders');
-    const ordersCount = await pool.query("SELECT COUNT(*) as total FROM orders WHERE status != 'Cancelled'"); // Fixed escaped quote
-
-    // ... (Rest of dashboard stats logic seems fine, truncating for brevity in this replace block if not changing) ...
-    // Actually, I need to keep the content I'm not changing if it's within the block or avoid touching it.
-    // The instructions say "Replace... TargetContent".
-    // I will target the User Routes specifically.
-  } catch (err) {
-    //...
-  }
-});
-// Wait, I shouldn't replace the whole file. I'll target the User Routes and the migration separately or usage safe blocks.
-// Let's stick to adding migration at the top and updating the User routes at the bottom.
-
-// ... (Skipping to User Routes) ...
-
-// 6. User Profile
-app.get('/api/users/me', async (req, res) => {
-  try {
-    // Use the first user found (Mock Auth)
-    const result = await pool.query('SELECT * FROM users ORDER BY id ASC LIMIT 1');
-    if (result.rows.length === 0) return res.status(404).send('User not found');
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
-
-app.put('/api/users/me', async (req, res) => {
-  try {
-    const { name, email, avatarUrl, nickname, preferences } = req.body;
-
-    // Check if user exists first to get ID
-    const userCheck = await pool.query('SELECT id FROM users ORDER BY id ASC LIMIT 1');
-    if (userCheck.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-    const userId = userCheck.rows[0].id;
-
-    const result = await pool.query(
-      'UPDATE users SET name = $1, email = $2, avatar_url = $3, nickname = $4, preferences = $5 WHERE id = $6 RETURNING *',
-      [name, email, avatarUrl, nickname, preferences, userId]
-    );
-    await logActivity('UPDATE', 'USER', userId, JSON.stringify({ name, nickname }));
-    res.json(result.rows[0]);
-  } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
   }
@@ -1153,7 +1139,6 @@ app.delete('/api/orders/:id', async (req, res) => {
     const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Order not found' });
 
-    // Log before response to ensure it's captured
     await logActivity('DELETE', 'ORDER', id, JSON.stringify({}));
     res.json({ message: 'Order deleted' });
   } catch (err) {
@@ -1162,49 +1147,10 @@ app.delete('/api/orders/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/clients/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    // Note: This might fail if there are foreign key constraints (orders). 
-    // Ideally we should cascade delete or check first.
-    // For now assuming ON DELETE CASCADE is set up or we accept the error.
-    const result = await pool.query('DELETE FROM clients WHERE id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Client not found' });
-
-    await logActivity('DELETE', 'CLIENT', id, JSON.stringify({}));
-    res.json({ message: 'Client deleted' });
-  } catch (err) {
-    console.error(err.message);
-    if (err.code === '23503') { // Foreign Key Violation
-      return res.status(400).json({ message: 'Cannot delete client with active orders.' });
-    }
-    res.status(500).send('Server Error');
-  }
-});
-
-app.delete('/api/fabrics/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query('DELETE FROM fabrics WHERE id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Fabric not found' });
-
-    await logActivity('DELETE', 'FABRIC', id, JSON.stringify({}));
-    res.json({ message: 'Fabric deleted' });
-  } catch (err) {
-    console.error(err.message);
-    if (err.code === '23503') { // Foreign Key Violation
-      return res.status(400).json({ message: 'Cannot delete fabric because it is used in existing orders.' });
-    }
-    res.status(500).send('Server Error');
-  }
-});
-
 // --- Serve Frontend in Production ---
 if (process.env.NODE_ENV === 'production') {
-  // Serve any static files
   app.use(express.static(path.join(__dirname, 'public')));
 
-  // Handle React routing, return all requests to React app
   app.get('*', function (req, res) {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   });
@@ -1212,7 +1158,6 @@ if (process.env.NODE_ENV === 'production') {
 
 // Start Server
 app.listen(port, async () => {
-  // Ensure Schema
   await migrateSchema();
   console.log(`Server running on port ${port}`);
 });

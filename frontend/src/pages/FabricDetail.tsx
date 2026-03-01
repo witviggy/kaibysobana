@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Save } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { api, getMediaUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal } from '../components/Modal';
@@ -89,18 +89,19 @@ const FabricDetail: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setIsDeleteModalOpen(true)}
-                        className="text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors"
+                        className="text-sm text-red-600 hover:text-red-700 font-medium p-1.5 rounded-md hover:bg-red-50 transition-colors flex items-center justify-center"
+                        title="Delete Fabric"
                     >
-                        Delete Fabric
+                        <Trash2 size={18} />
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-zinc-200 p-8 shadow-sm">
-                <div className="flex justify-between items-start mb-6">
+            <div className="bg-white rounded-lg border border-zinc-200 p-6 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
                     <div>
-                        <h1 className="text-xl font-semibold text-zinc-900">{fabric.name}</h1>
-                        <p className="text-zinc-500">{fabric.color}</p>
+                        <h1 className="text-lg font-semibold text-zinc-900">{fabric.name}</h1>
+                        <p className="text-sm text-zinc-500">{fabric.color}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${fabric.metersAvailable < 5 ? 'bg-red-50 text-red-700 border-red-100' :
                         fabric.metersAvailable < 10 ? 'bg-amber-50 text-amber-700 border-amber-100' :
@@ -111,23 +112,23 @@ const FabricDetail: React.FC = () => {
                 </div>
 
                 {fabric.imageUrl && (
-                    <div className="mb-8 rounded-lg overflow-hidden border border-zinc-200 bg-zinc-50 h-64 sm:h-80">
+                    <div className="mb-5 rounded-lg overflow-hidden border border-zinc-200 bg-zinc-50 h-48">
                         <img src={getMediaUrl(fabric.imageUrl)} alt={fabric.name} className="w-full h-full object-cover" />
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-8">
-                    <div className="p-4 bg-zinc-50 rounded-md border border-zinc-100">
+                <div className="grid grid-cols-3 gap-4 mb-5">
+                    <div className="p-3 bg-zinc-50 rounded-md border border-zinc-100">
                         <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Current Stock</label>
-                        <div className="text-xl font-semibold text-zinc-900 mt-1">{fabric.metersAvailable} m</div>
+                        <div className="text-lg font-semibold text-zinc-900 mt-0.5">{fabric.metersAvailable} m</div>
                     </div>
-                    <div className="p-4 bg-zinc-50 rounded-md border border-zinc-100">
+                    <div className="p-3 bg-zinc-50 rounded-md border border-zinc-100">
                         <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Price per Meter</label>
-                        <div className="text-xl font-semibold text-zinc-900 mt-1">₹{fabric.pricePerMeter}</div>
+                        <div className="text-lg font-semibold text-zinc-900 mt-0.5">₹{fabric.pricePerMeter}</div>
                     </div>
-                    <div className="p-4 bg-zinc-50 rounded-md border border-zinc-100">
-                        <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Consumption Rate</label>
-                        <div className="text-base font-medium text-zinc-900 mt-1">{fabric.metersPerOutfit} m / outfit</div>
+                    <div className="p-3 bg-zinc-50 rounded-md border border-zinc-100">
+                        <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Usage / Outfit</label>
+                        <div className="text-base font-medium text-zinc-900 mt-0.5">{fabric.metersPerOutfit} m</div>
                     </div>
                 </div>
 
