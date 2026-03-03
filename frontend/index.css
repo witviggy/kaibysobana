@@ -223,6 +223,7 @@ body {
   transition: all var(--transition-fast);
   background: white;
   color: var(--primary-900);
+  caret-color: var(--primary-900);
 }
 
 .input-premium:focus {
@@ -233,6 +234,13 @@ body {
 
 .input-premium:hover:not(:focus) {
   border-color: var(--neutral-300);
+}
+
+/* Global input caret fix to prevent invisible white cursors on white backgrounds */
+input,
+textarea,
+select {
+  caret-color: var(--primary-900);
 }
 
 /* === Badge Styles (Subtle) === */

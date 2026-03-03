@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Plus, User, Phone, Mail, MapPin, ArrowUpRight, Users, Download, Trash2 } from 'lucide-react';
+import { Search, Filter, Plus, User, Phone, Mail, MapPin, ArrowUpRight, Users, Download, Trash2, UserPlus } from 'lucide-react';
 import { api, getMediaUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import ConfirmModal from '../components/ConfirmModal';
@@ -94,11 +94,11 @@ const Clients: React.FC = () => {
                     >
                         <Download size={16} /> Export
                     </button>
-                    <button
+                    {/* <button
                         onClick={() => navigate('/clients/new')}
                         className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-all">
                         <Plus size={16} /> Add Client
-                    </button>
+                    </button> */}
                 </div>
             </div>
 
@@ -140,7 +140,7 @@ const Clients: React.FC = () => {
                 <div className="bg-white p-4 rounded-lg border border-zinc-200 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-zinc-100 rounded flex items-center justify-center text-blue-500">
-                            <Plus size={18} />
+                            <UserPlus size={18} />
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500 font-medium uppercase tracking-wide">New This Month</p>

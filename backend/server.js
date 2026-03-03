@@ -107,7 +107,8 @@ const migrateSchema = async () => {
   // 3. Add image_url to fabrics
   await runQuery(`
         ALTER TABLE fabrics ADD COLUMN IF NOT EXISTS image_url TEXT;
-    `, "Fabric Image Column");
+        ALTER TABLE fabrics ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+    `, "Fabric Image and Soft Delete Columns");
 
   // 3b. Add image_url to products
   await runQuery(`
@@ -133,10 +134,20 @@ const migrateSchema = async () => {
             name VARCHAR(255) NOT NULL UNIQUE,
             default_fabric_id INTEGER REFERENCES fabrics(id),
             base_price NUMERIC(10, 2) DEFAULT 0,
+            image_url VARCHAR(255),
             description TEXT,
             created_at TIMESTAMP DEFAULT NOW()
         );
     `, "Products/Catalog Table");
+
+  // Alter Products Table (For Catalog Automations)
+  await runQuery(`
+      ALTER TABLE products 
+      ADD COLUMN IF NOT EXISTS fabric_required NUMERIC(10, 2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS stitching_cost NUMERIC(10, 2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS price_per_size JSONB DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS fabric_per_size JSONB DEFAULT '{}';
+  `, "Alter Products Table");
 
   // 6. Order Items (Multi-Dress Support)
   await runQuery(`
@@ -151,10 +162,29 @@ const migrateSchema = async () => {
             fabric_required NUMERIC(10, 2) DEFAULT 0,
             fabric_cost NUMERIC(10, 2) DEFAULT 0,
             stitching_cost NUMERIC(10, 2) DEFAULT 0,
+            profit_margin NUMERIC(10, 2) DEFAULT 0,
             selling_price NUMERIC(10, 2) DEFAULT 0,
             remarks TEXT
         );
     `, "Order Items Table");
+
+  // Retrofit profit_margin to existing order_items tables
+  await runQuery(`
+      ALTER TABLE order_items 
+      ADD COLUMN IF NOT EXISTS profit_margin NUMERIC(10, 2) DEFAULT 0;
+  `, "Alter Order Items Table with Profit Margin");
+
+  // 6.5 App Settings
+  await runQuery(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+          id SERIAL PRIMARY KEY,
+          app_name VARCHAR(255) DEFAULT 'கை(kai)',
+          logo_url TEXT DEFAULT '/src/logo/kailogov1.png'
+      );
+      INSERT INTO app_settings (id, app_name, logo_url)
+      SELECT 1, 'கை(kai)', '/src/logo/kailogov1.png'
+      WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE id = 1);
+  `, "App Settings Table");
 
   // 7. Seed default admin if no users exist
   await runQuery(`
@@ -442,6 +472,42 @@ app.put('/api/users/:id/password', verifyToken, async (req, res) => {
   }
 });
 
+// App Settings (Global Application Config)
+app.get('/api/settings/app', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT app_name as "appName", logo_url as "logoUrl" FROM app_settings WHERE id = 1');
+    if (result.rows.length === 0) {
+      return res.json({ appName: 'கை(kai)', logoUrl: '/src/logo/kailogov1.png' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('❌ Error fetching app settings:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+app.put('/api/settings/app', verifyToken, async (req, res) => {
+  try {
+    // Check if admin
+    const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (adminCheck.rows.length === 0 || (adminCheck.rows[0].role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required to change app settings' });
+    }
+
+    const { appName, logoUrl } = req.body;
+    const result = await pool.query(
+      `UPDATE app_settings SET app_name = COALESCE($1, app_name), logo_url = COALESCE($2, logo_url) WHERE id = 1 RETURNING app_name as "appName", logo_url as "logoUrl"`,
+      [appName, logoUrl]
+    );
+
+    await logActivity('UPDATE', 'APP_SETTINGS', 1, JSON.stringify({ appName, logoUrl }));
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('❌ Error updating app settings:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // --- Routes ---
 
 // 0. File Upload Endpoint (Supabase Storage or Local Fallback)
@@ -462,16 +528,19 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
+    const folder = req.body.folder || '';
+
     // Generate unique filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const fileName = uniqueSuffix + path.extname(req.file.originalname);
+    const storagePath = folder ? `${folder}/${fileName}` : fileName;
 
     // Try Supabase first, fallback to local storage
     if (supabase) {
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('images')
-        .upload(fileName, req.file.buffer, {
+        .upload(storagePath, req.file.buffer, {
           contentType: req.file.mimetype,
           upsert: false
         });
@@ -484,16 +553,21 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('images')
-        .getPublicUrl(fileName);
+        .getPublicUrl(storagePath);
 
       return res.json({ url: urlData.publicUrl });
     } else {
       // Local file storage fallback
-      const filePath = path.join(UPLOADS_DIR, fileName);
+      const targetDir = folder ? path.join(UPLOADS_DIR, folder) : UPLOADS_DIR;
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      const filePath = path.join(targetDir, fileName);
       fs.writeFileSync(filePath, req.file.buffer);
 
       // Return URL relative to backend
-      const publicUrl = `${BACKEND_URL}/uploads/${fileName}`;
+      const publicUrl = folder ? `${BACKEND_URL}/uploads/${folder}/${fileName}` : `${BACKEND_URL}/uploads/${fileName}`;
       console.log('📁 File saved locally:', publicUrl);
       return res.json({ url: publicUrl });
     }
@@ -565,7 +639,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
     // Low Stock Alerts
     const lowStockQuery = await pool.query(`
-        SELECT * FROM fabrics WHERE meters_available < 10
+        SELECT * FROM fabrics WHERE meters_available < 10 AND is_deleted = FALSE
     `);
 
     // Recent Orders
@@ -748,6 +822,7 @@ app.get('/api/fabrics', async (req, res) => {
         status,
         image_url as "imageUrl"
       FROM fabrics
+      WHERE is_deleted = FALSE
       ORDER BY meters_available ASC
     `);
     res.json(result.rows);
@@ -833,11 +908,23 @@ app.patch('/api/fabrics/:id/stock', async (req, res) => {
 app.delete('/api/fabrics/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Check if fabric is used in orders
+    const orderCheck = await pool.query('SELECT 1 FROM orders WHERE fabric_id = $1 LIMIT 1', [id]);
+
+    if (orderCheck.rows.length > 0) {
+      // Soft delete if used in orders to preserve history
+      const updateResult = await pool.query('UPDATE fabrics SET is_deleted = TRUE WHERE id = $1 RETURNING *', [id]);
+      if (updateResult.rows.length === 0) return res.status(404).json({ message: 'Fabric not found' });
+      await logActivity('ARCHIVE', 'FABRIC', id, JSON.stringify({ note: 'Soft deleted due to existing orders' }));
+      return res.json({ message: 'Fabric archived successfully' });
+    }
+
     const result = await pool.query('DELETE FROM fabrics WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Fabric not found' });
 
     await logActivity('DELETE', 'FABRIC', id, JSON.stringify({}));
-    res.json({ message: 'Fabric deleted' });
+    res.json({ message: 'Fabric deleted successfully' });
   } catch (err) {
     console.error(err.message);
     if (err.code === '23503') {
@@ -903,8 +990,14 @@ app.delete('/api/events/:id', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT p.*, f.name as "defaultFabricName",
-        p.image_url as "imageUrl"
+      SELECT 
+        p.*, 
+        f.name as "defaultFabricName",
+        f.color as "defaultFabricColor",
+        p.fabric_required as "fabricRequired",
+        p.stitching_cost as "stitchingCost",
+        p.price_per_size as "pricePerSize",
+        p.fabric_per_size as "fabricPerSize"
       FROM products p 
       LEFT JOIN fabrics f ON p.default_fabric_id = f.id 
       ORDER BY p.name ASC
@@ -918,10 +1011,10 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, defaultFabricId, basePrice, description, imageUrl } = req.body;
+    const { name, defaultFabricId, basePrice, description, imageUrl, fabricRequired, stitchingCost, pricePerSize, fabricPerSize } = req.body;
     const newProduct = await pool.query(
-      'INSERT INTO products (name, default_fabric_id, base_price, description, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, defaultFabricId || null, basePrice || 0, description, imageUrl || null]
+      'INSERT INTO products (name, default_fabric_id, base_price, description, image_url, fabric_required, stitching_cost, price_per_size, fabric_per_size) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [name, defaultFabricId || null, basePrice || 0, description, imageUrl || null, fabricRequired || 0, stitchingCost || 0, pricePerSize || '{}', fabricPerSize || '{}']
     );
     res.json(newProduct.rows[0]);
   } catch (err) {
@@ -936,10 +1029,10 @@ app.post('/api/products', async (req, res) => {
 app.put('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, defaultFabricId, basePrice, description, imageUrl } = req.body;
+    const { name, defaultFabricId, basePrice, description, imageUrl, fabricRequired, stitchingCost, pricePerSize, fabricPerSize } = req.body;
     const updated = await pool.query(
-      'UPDATE products SET name = $1, default_fabric_id = $2, base_price = $3, description = $4, image_url = $5 WHERE id = $6 RETURNING *',
-      [name, defaultFabricId || null, basePrice || 0, description, imageUrl || null, id]
+      'UPDATE products SET name = $1, default_fabric_id = $2, base_price = $3, description = $4, image_url = $5, fabric_required = $6, stitching_cost = $7, price_per_size = $8, fabric_per_size = $9 WHERE id = $10 RETURNING *',
+      [name, defaultFabricId || null, basePrice || 0, description, imageUrl || null, fabricRequired || 0, stitchingCost || 0, pricePerSize || '{}', fabricPerSize || '{}', id]
     );
     res.json(updated.rows[0]);
   } catch (err) {
@@ -992,7 +1085,7 @@ app.get('/api/orders/:id', async (req, res) => {
     const result = await pool.query(`
     SELECT
     o.id,
-      o.client_id as "clientId", c.name as "clientName", c.email as "clientEmail",
+      o.client_id as "clientId", c.name as "clientName", c.email as "clientEmail", c.phone as "clientPhone", c.address as "clientAddress",
       o.fabric_id as "fabricId", f.name as "fabricName", f.color as "fabricColor",
       o.quantity, o.status,
       o.dress_name as "dressName",
@@ -1010,12 +1103,31 @@ app.get('/api/orders/:id', async (req, res) => {
       o.profit
             FROM orders o
             JOIN clients c ON o.client_id = c.id
-            JOIN fabrics f ON o.fabric_id = f.id
+            LEFT JOIN fabrics f ON o.fabric_id = f.id
             WHERE o.id = $1
       `, [id]);
 
-    if (result.rows.length === 0) return res.status(404).send('Order not found');
-    res.json(result.rows[0]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Order not found' });
+    const orderData = result.rows[0];
+
+    // Fetch items
+    const itemsResult = await pool.query(`
+      SELECT 
+        oi.id, oi.dress_name as "dressName", oi.fabric_id as "fabricId",
+        f.name as "fabricName", f.color as "fabricColor",
+        oi.quantity, oi.size_chart as "sizeChart", 
+        oi.fabric_required as "fabricRequired", oi.fabric_cost as "fabricCost", 
+        oi.stitching_cost as "stitchingCost", oi.profit_margin as "profitMargin", 
+        oi.selling_price as "sellingPrice"
+      FROM order_items oi
+      LEFT JOIN fabrics f ON oi.fabric_id = f.id
+      WHERE oi.order_id = $1
+    `, [id]);
+
+    // Attach items (if empty, we can fallback to flat item if needed, but UI should handle it)
+    orderData.items = itemsResult.rows;
+
+    res.json(orderData);
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
@@ -1062,11 +1174,11 @@ app.post('/api/orders', async (req, res) => {
         await pool.query(
           `INSERT INTO order_items(
             order_id, dress_name, fabric_id, quantity, size_chart, fabric_required, 
-            fabric_cost, stitching_cost, selling_price
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            fabric_cost, stitching_cost, profit_margin, selling_price
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
-            id, item.dressName, item.fabricId, item.quantity, item.sizeChart, item.fabricRequired,
-            item.fabricCost, item.stitchingCost, item.sellingPrice
+            id, item.dressName, item.fabricId || null, item.quantity, item.sizeChart, item.fabricRequired || 0,
+            item.fabricCost || 0, item.stitchingCost || 0, item.profitMargin || 0, item.sellingPrice || 0
           ]
         );
 
@@ -1110,14 +1222,16 @@ app.put('/api/orders/:id', async (req, res) => {
 
     const updateOrder = await pool.query(
       `UPDATE orders 
-       SET client_id = $1, fabric_id = $2, quantity = $3, order_date = $4, delivery_date = $5, status = $6,
-      selling_price = $7, stitching_cost = $8, fabric_cost = $9, courier_cost_from_me = $10, courier_cost_to_me = $11,
-      dress_name = $12, size_chart = $13, fabric_required = $14, remarks = $15
-       WHERE id = $16 RETURNING * `,
+       SET client_id = $1, status = $2, order_date = $3, delivery_date = $4,
+           selling_price = $5, stitching_cost = $6, fabric_cost = $7, 
+           courier_cost_from_me = $8, courier_cost_to_me = $9, remarks = $10,
+           quantity = $11
+       WHERE id = $12 RETURNING * `,
       [
-        clientId, fabricId, quantity, orderDate, deliveryDate, status,
-        sellingPrice, stitchingCost, fabricCost, courierCostFromMe, courierCostToMe,
-        dressName, sizeChart, fabricRequired, remarks,
+        clientId, status, orderDate, deliveryDate,
+        sellingPrice, stitchingCost, fabricCost,
+        courierCostFromMe, courierCostToMe, remarks,
+        req.body.items ? req.body.items.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0) : quantity,
         id
       ]
     );
@@ -1125,7 +1239,26 @@ app.put('/api/orders/:id', async (req, res) => {
     if (updateOrder.rows.length === 0) {
       return res.status(404).json({ message: 'Order not found' });
     }
-    await logActivity('UPDATE', 'ORDER', id, JSON.stringify({ status, quantity }));
+
+    // Process items update: simple approach is delete existing items, insert new ones
+    if (req.body.items && req.body.items.length > 0) {
+      await pool.query('DELETE FROM order_items WHERE order_id = $1', [id]);
+      for (const item of req.body.items) {
+        await pool.query(
+          `INSERT INTO order_items(
+            order_id, dress_name, fabric_id, quantity, size_chart, fabric_required, 
+            fabric_cost, stitching_cost, profit_margin, selling_price
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            id, item.dressName, item.fabricId || null, item.quantity, item.sizeChart,
+            item.fabricRequired || 0, item.fabricCost || 0, item.stitchingCost || 0,
+            item.profitMargin || 0, item.sellingPrice || 0
+          ]
+        );
+      }
+    }
+
+    await logActivity('UPDATE', 'ORDER', id, JSON.stringify({ status, clientId }));
     res.json(updateOrder.rows[0]);
   } catch (err) {
     console.error(err.message);

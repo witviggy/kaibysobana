@@ -52,13 +52,26 @@ const ClientForm: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validations
+        const phoneRegex = /^[0-9]{10}$/;
+        if (!phoneRegex.test(formData.phone.replace(/\D/g, ''))) {
+            addToast("Please enter a valid 10-digit mobile number.", 'error');
+            return;
+        }
+
         setIsSubmitting(true);
         try {
+            const payload = {
+                ...formData,
+                phone: formData.phone
+            };
+
             if (isEditing) {
-                await api.updateClient(id, formData);
+                await api.updateClient(id, payload);
                 addToast("Client updated successfully", 'success');
             } else {
-                await api.createClient(formData);
+                await api.createClient(payload);
                 addToast("Client added successfully", 'success');
             }
             setTimeout(() => {
@@ -69,6 +82,12 @@ const ClientForm: React.FC = () => {
             addToast(error.message || `Failed to ${isEditing ? 'update' : 'create'} client`, 'error');
             setIsSubmitting(false);
         }
+    };
+
+    const handleAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setFormData({ ...formData, address: e.target.value });
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
     };
 
     if (isLoading) return (
@@ -134,6 +153,8 @@ const ClientForm: React.FC = () => {
                                 <input
                                     type="email"
                                     required
+                                    pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                                    title="Please enter a valid email address (e.g. name@domain.com)"
                                     placeholder="sobana@example.com"
                                     className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
                                     value={formData.email}
@@ -147,10 +168,11 @@ const ClientForm: React.FC = () => {
                                 <input
                                     type="tel"
                                     required
-                                    placeholder="+91 98765 43210"
+                                    maxLength={10}
+                                    placeholder="9876543210"
                                     className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
                                     value={formData.phone}
-                                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                    onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                                 />
                             </div>
                         </div>
@@ -163,9 +185,9 @@ const ClientForm: React.FC = () => {
                                 required
                                 rows={3}
                                 placeholder="Full address including pin code"
-                                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors"
+                                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-colors resize-none overflow-hidden"
                                 value={formData.address}
-                                onChange={e => setFormData({ ...formData, address: e.target.value })}
+                                onChange={handleAddressChange}
                             />
                         </div>
 

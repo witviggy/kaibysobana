@@ -17,7 +17,6 @@ const NewFabric: React.FC = () => {
         name: '',
         color: '',
         metersAvailable: 0,
-        metersPerOutfit: 2,
         pricePerMeter: 0,
         status: 'In Stock',
         imageUrl: ''
@@ -32,7 +31,6 @@ const NewFabric: React.FC = () => {
                         name: data.name,
                         color: data.color,
                         metersAvailable: Number(data.metersAvailable),
-                        metersPerOutfit: Number(data.metersPerOutfit),
                         pricePerMeter: Number(data.pricePerMeter),
                         status: data.status,
                         imageUrl: data.imageUrl || ''
@@ -131,7 +129,7 @@ const NewFabric: React.FC = () => {
                             Inventory & Pricing
                         </h3>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-zinc-700">Initial Stock</label>
                                 <div className="relative">
@@ -158,21 +156,6 @@ const NewFabric: React.FC = () => {
                                     value={formData.pricePerMeter}
                                     onChange={e => setFormData({ ...formData, pricePerMeter: parseFloat(e.target.value) })}
                                 />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-zinc-700">Usage / Outfit</label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        required
-                                        step="0.1"
-                                        min="0"
-                                        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 pr-8"
-                                        value={formData.metersPerOutfit}
-                                        onChange={e => setFormData({ ...formData, metersPerOutfit: parseFloat(e.target.value) })}
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-bold">m</span>
-                                </div>
                             </div>
                         </div>
 
@@ -215,16 +198,10 @@ const NewFabric: React.FC = () => {
                                 </div>
                             )}
 
-                            <div className="mt-4 pt-4 border-t border-zinc-700 flex justify-between items-end">
+                            <div className="mt-4 pt-4 border-t border-zinc-700">
                                 <div>
                                     <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Total Value</p>
                                     <p className="text-sm font-bold text-white">₹{(formData.metersAvailable * formData.pricePerMeter).toLocaleString()}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold">Yield</p>
-                                    <p className="text-sm font-bold text-white">
-                                        ~{formData.metersPerOutfit > 0 ? Math.floor(formData.metersAvailable / formData.metersPerOutfit) : 0} units
-                                    </p>
                                 </div>
                             </div>
                         </div>

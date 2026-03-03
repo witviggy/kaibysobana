@@ -42,7 +42,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     const [addingMember, setAddingMember] = useState(false);
     const [showMemberPassword, setShowMemberPassword] = useState(false);
 
-    const isAdmin = authUser?.role === 'admin';
+    // Global App Settings
+    const [appSettings, setAppSettings] = useState({ appName: '', logoUrl: '' });
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+    const isAdmin = user?.role?.toLowerCase() === 'admin';
 
     useEffect(() => {
         if (!isOpen) return;
@@ -68,6 +72,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     try {
                         const users = await api.getUsers();
                         setMembers(users);
+                        const settingsData = await api.getAppSettings();
+                        if (settingsData) setAppSettings(settingsData);
                     } catch (e) { console.error(e); }
                 }
             } catch (error) {
@@ -84,6 +90,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         try {
             setIsSaving(true); setSaveSuccess(false);
             const updated = await api.updateCurrentUser(formData);
+            if (isAdmin) {
+                await api.updateAppSettings({ appName: appSettings.appName, logoUrl: appSettings.logoUrl });
+            }
             setUser(updated);
             await refreshUser();
             setSaveSuccess(true);
@@ -93,6 +102,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             addToast("Failed to save", 'error');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            try {
+                setIsUploadingLogo(true);
+                const res = await api.uploadImage(e.target.files[0], 'appconfig');
+                setAppSettings({ ...appSettings, logoUrl: res.url });
+                addToast("Logo uploaded successfully", "success");
+            } catch (error) {
+                console.error("Upload error", error);
+                addToast("Failed to upload logo", "error");
+            } finally {
+                setIsUploadingLogo(false);
+            }
         }
     };
 
@@ -173,7 +198,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     return ReactDOM.createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
             <div
-                className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[520px] flex flex-col overflow-hidden animate-fade-in"
+                className="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[650px] flex flex-col overflow-hidden animate-fade-in"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -260,6 +285,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                             <input type="text" placeholder="Or paste a custom image URL..." value={formData.avatarUrl} onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })} className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
                                         </div>
                                     </div>
+
+                                    {/* Application Settings (Admin Only) */}
+                                    {isAdmin && (
+                                        <div className="space-y-5 pt-5 border-t border-zinc-100 mt-6">
+                                            <h3 className="text-sm font-semibold text-zinc-900">Application Configuration</h3>
+                                            <div className="grid grid-cols-2 gap-5">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-zinc-600">Application Name</label>
+                                                    <input type="text" value={appSettings.appName || ''} onChange={(e) => setAppSettings({ ...appSettings, appName: e.target.value })} placeholder="e.g. கை(kai)" className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
+                                                </div>
+                                                <div className="space-y-1.5 flex flex-col justify-end">
+                                                    <label className="flex items-center justify-between text-xs font-medium text-zinc-600">
+                                                        <span>Logo Image</span>
+                                                        <label className="cursor-pointer text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors">
+                                                            <Camera size={13} />
+                                                            {isUploadingLogo ? 'Uploading...' : 'Upload File'}
+                                                            <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} />
+                                                        </label>
+                                                    </label>
+                                                    <div className="flex items-center gap-3">
+                                                        {appSettings.logoUrl && <img src={appSettings.logoUrl} alt="Logo" className="w-9 h-9 rounded bg-zinc-50 border border-zinc-200 object-contain shrink-0" />}
+                                                        <input type="text" value={appSettings.logoUrl || ''} onChange={(e) => setAppSettings({ ...appSettings, logoUrl: e.target.value })} placeholder="e.g. /src/logo/kailogov1.png" className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
 
@@ -296,77 +348,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="pt-5 border-t border-zinc-100">
-                                        <div className="p-4 bg-zinc-50 rounded-md border border-zinc-100 flex items-center justify-between">
-                                            <div>
-                                                <p className="font-medium text-sm text-zinc-900">Two-Factor Authentication</p>
-                                                <p className="text-xs text-zinc-500 mt-0.5">Add an extra layer of security</p>
-                                            </div>
-                                            <button className="px-3 py-1.5 bg-white border border-zinc-200 text-zinc-700 rounded text-xs font-medium hover:bg-zinc-50 transition-colors">Enable</button>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
 
                             {activeTab === 'appearance' && (
-                                <div className="space-y-6">
-                                    <h3 className="text-sm font-semibold text-zinc-900">Appearance & Charts</h3>
-                                    <div className="p-5 bg-zinc-50 rounded-lg border border-zinc-100 space-y-4">
-                                        <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Dashboard Analytics</h4>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <div><span className="text-sm text-zinc-700 font-medium">Revenue Trends</span><p className="text-xs text-zinc-500">Income vs profit over time</p></div>
-                                                <Toggle value={formData.preferences.dashboard.revenueChart.show} onChange={() => setFormData({ ...formData, preferences: { ...formData.preferences, dashboard: { ...formData.preferences.dashboard, revenueChart: { ...formData.preferences.dashboard.revenueChart, show: !formData.preferences.dashboard.revenueChart.show } } } })} />
-                                            </div>
-                                            {formData.preferences.dashboard.revenueChart.show && (
-                                                <div className="flex items-center justify-between pl-4 border-l-2 border-zinc-200">
-                                                    <span className="text-sm text-zinc-600">Chart Type</span>
-                                                    <select value={formData.preferences.dashboard.revenueChart.type} onChange={(e) => setFormData({ ...formData, preferences: { ...formData.preferences, dashboard: { ...formData.preferences.dashboard, revenueChart: { ...formData.preferences.dashboard.revenueChart, type: e.target.value as any } } } })} className="px-3 py-1.5 border border-zinc-300 rounded text-sm bg-white focus:outline-none focus:border-zinc-500">
-                                                        <option value="area">Area</option><option value="bar">Bar</option><option value="line">Line</option>
-                                                    </select>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center justify-between pt-3 border-t border-zinc-200">
-                                                <div><span className="text-sm text-zinc-700 font-medium">Production Status</span><p className="text-xs text-zinc-500">Pie chart of statuses</p></div>
-                                                <Toggle value={formData.preferences.dashboard.statusPie.show} onChange={() => setFormData({ ...formData, preferences: { ...formData.preferences, dashboard: { ...formData.preferences.dashboard, statusPie: { ...formData.preferences.dashboard.statusPie, show: !formData.preferences.dashboard.statusPie.show } } } })} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="p-5 bg-zinc-50 rounded-lg border border-zinc-100 space-y-4">
-                                        <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Financial Reports</h4>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <div><span className="text-sm text-zinc-700 font-medium">Revenue Analysis</span><p className="text-xs text-zinc-500">Monthly revenue</p></div>
-                                                <Toggle value={formData.preferences.financials.revenueChart.show} onChange={() => setFormData({ ...formData, preferences: { ...formData.preferences, financials: { ...formData.preferences.financials, revenueChart: { ...formData.preferences.financials.revenueChart, show: !formData.preferences.financials.revenueChart.show } } } })} />
-                                            </div>
-                                            {formData.preferences.financials.revenueChart.show && (
-                                                <div className="flex items-center justify-between pl-4 border-l-2 border-zinc-200">
-                                                    <span className="text-sm text-zinc-600">Chart Type</span>
-                                                    <select value={formData.preferences.financials.revenueChart.type} onChange={(e) => setFormData({ ...formData, preferences: { ...formData.preferences, financials: { ...formData.preferences.financials, revenueChart: { ...formData.preferences.financials.revenueChart, type: e.target.value as any } } } })} className="px-3 py-1.5 border border-zinc-300 rounded text-sm bg-white focus:outline-none focus:border-zinc-500">
-                                                        <option value="area">Area</option><option value="bar">Bar</option><option value="line">Line</option>
-                                                    </select>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center justify-between pt-3 border-t border-zinc-200">
-                                                <div><span className="text-sm text-zinc-700 font-medium">Expense Breakdown</span><p className="text-xs text-zinc-500">Cost distribution</p></div>
-                                                <Toggle value={formData.preferences.financials.expensesPie.show} onChange={() => setFormData({ ...formData, preferences: { ...formData.preferences, financials: { ...formData.preferences.financials, expensesPie: { ...formData.preferences.financials.expensesPie, show: !formData.preferences.financials.expensesPie.show } } } })} />
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div className="space-y-6 h-full flex flex-col items-center justify-center text-center opacity-70">
+                                    <Shield size={32} className="text-zinc-400 mb-2" />
+                                    <h3 className="text-sm font-semibold text-zinc-900">This feature is locked</h3>
+                                    <p className="text-xs text-zinc-500 max-w-xs">Customizing appearance templates and colors requires an upgraded license tier.</p>
                                 </div>
                             )}
 
                             {activeTab === 'notifications' && (
-                                <div className="space-y-5">
-                                    <h3 className="text-sm font-semibold text-zinc-900">Notification Preferences</h3>
-                                    {['Order Updates', 'Low Stock Alerts', 'Client Messages', 'Weekly Reports'].map((item, i) => (
-                                        <div key={i} className="flex items-center justify-between p-4 bg-zinc-50 rounded-md border border-zinc-100">
-                                            <span className="font-medium text-sm text-zinc-700">{item}</span>
-                                            <div className="w-10 h-5 bg-zinc-900 rounded-full relative cursor-pointer">
-                                                <div className="absolute right-1 top-1 bottom-1 w-3 bg-white rounded-full" />
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="space-y-6 h-full flex flex-col items-center justify-center text-center opacity-70">
+                                    <Shield size={32} className="text-zinc-400 mb-2" />
+                                    <h3 className="text-sm font-semibold text-zinc-900">This feature is locked</h3>
+                                    <p className="text-xs text-zinc-500 max-w-xs">Connecting external notification channels (like SMS or Discord) is currently disabled.</p>
                                 </div>
                             )}
 
@@ -437,15 +434,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                             )}
 
                             {activeTab === 'billing' && (
-                                <div className="space-y-5">
-                                    <h3 className="text-sm font-semibold text-zinc-900">Billing</h3>
-                                    <div className="p-6 bg-zinc-50 rounded-md border border-zinc-100 flex items-center justify-between">
-                                        <div>
-                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">Current Plan</span>
-                                            <p className="text-lg font-semibold text-zinc-900 mt-0.5">Pro Workspace</p>
-                                        </div>
-                                        <button className="px-3 py-1.5 bg-zinc-900 text-white rounded text-xs font-medium hover:bg-black transition-colors">Manage</button>
-                                    </div>
+                                <div className="space-y-6 h-full flex flex-col items-center justify-center text-center opacity-70">
+                                    <Shield size={32} className="text-zinc-400 mb-2" />
+                                    <h3 className="text-sm font-semibold text-zinc-900">This feature is locked</h3>
+                                    <p className="text-xs text-zinc-500 max-w-xs">Billing and invoice management requires upgrading to the complete suite.</p>
                                 </div>
                             )}
                         </div>

@@ -1,5 +1,5 @@
-
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -12,16 +12,16 @@ interface ModalProps {
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+                className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
             />
 
             {/* Card */}
-            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md border border-zinc-200 overflow-hidden animate-slide-up">
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md border border-zinc-200 overflow-hidden animate-slide-up z-[10000]">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
                     <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
                     <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 transition-colors">
@@ -32,7 +32,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
                     {children}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

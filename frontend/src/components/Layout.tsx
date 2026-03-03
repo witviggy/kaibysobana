@@ -20,7 +20,6 @@ import NewFabric from '../pages/NewFabric';
 import Orders from '../pages/Orders';
 import OrderDetail from '../pages/OrderDetail';
 import ActivityLogs from '../pages/ActivityLogs';
-import Financials from '../pages/Financials';
 import SettingsModal from '../pages/Settings';
 import Calendar from '../pages/Calendar';
 import Catalog from '../pages/Catalog';
@@ -55,6 +54,7 @@ export const Layout: React.FC = () => {
     const [allClients, setAllClients] = useState<any[]>([]);
     const [allOrders, setAllOrders] = useState<any[]>([]);
     const [allFabrics, setAllFabrics] = useState<any[]>([]);
+    const [appSettings, setAppSettings] = useState({ appName: 'கை(kai)', logoUrl: '/src/logo/kailogov1.png' });
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -81,14 +81,18 @@ export const Layout: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [clients, orders, fabrics] = await Promise.all([
+                const [clients, orders, fabrics, settings] = await Promise.all([
                     api.getClients(),
                     api.getOrders(),
-                    api.getFabrics()
+                    api.getFabrics(),
+                    api.getAppSettings()
                 ]);
                 setAllClients(clients);
                 setAllOrders(orders);
                 setAllFabrics(fabrics);
+                if (settings) {
+                    setAppSettings(settings);
+                }
             } catch (e) {
                 console.error("Failed to fetch global data", e);
             }
@@ -142,11 +146,11 @@ export const Layout: React.FC = () => {
                 <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100">
                     <div className="flex items-center gap-3">
                         <img
-                            src="/src/logo/kailogov1.png"
-                            alt="கை(kai)"
+                            src={appSettings.logoUrl}
+                            alt={appSettings.appName}
                             className="w-8 h-8 rounded-lg object-contain"
                         />
-                        <span className="text-base font-bold tracking-tight text-zinc-900">கை(kai)</span>
+                        <span className="text-base font-bold tracking-tight text-zinc-900">{appSettings.appName}</span>
                     </div>
                     <button onClick={toggleSidebar} className="ml-auto lg:hidden text-zinc-400 hover:text-zinc-600 p-2">
                         <X size={20} />
@@ -161,7 +165,6 @@ export const Layout: React.FC = () => {
                     <SidebarItem icon={Scissors} label="Fabric Inventory" path="/stock" isActive={isActive('/stock')} onClick={() => setSidebarOpen(false)} />
                     <SidebarItem icon={ShoppingBag} label="Catalog" path="/catalog" isActive={isActive('/catalog')} onClick={() => setSidebarOpen(false)} />
                     <SidebarItem icon={CalendarIcon} label="Calendar" path="/calendar" isActive={isActive('/calendar')} onClick={() => setSidebarOpen(false)} />
-                    <SidebarItem icon={PieChart} label="Financials" path="/financials" isActive={isActive('/financials')} onClick={() => setSidebarOpen(false)} />
 
                 </div>
 
@@ -278,7 +281,6 @@ export const Layout: React.FC = () => {
                         <Route path="/orders/:id" element={<OrderDetail />} />
                         <Route path="/calendar" element={<Calendar />} />
                         <Route path="/catalog" element={<Catalog />} />
-                        <Route path="/financials" element={<Financials />} />
                         <Route path="/activity-logs" element={<ActivityLogs />} />
                         <Route path="*" element={
                             <div className="flex flex-col items-center justify-center h-full text-zinc-400">

@@ -35,6 +35,24 @@ export const getMediaUrl = (path?: string) => {
 };
 
 export const api = {
+  // --- Global Settings ---
+  getAppSettings: async () => {
+    const res = await fetch(`${API_URL}/settings/app`);
+    return handleResponse(res);
+  },
+
+  updateAppSettings: async (data: { appName: string; logoUrl: string }) => {
+    const res = await fetch(`${API_URL}/settings/app`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(res);
+  },
+
   // --- Dashboard Analytics ---
   getDashboardStats: async (range: string = '7d') => {
     // Falls back to mock data if server isn't running for demo purposes
@@ -47,9 +65,12 @@ export const api = {
     }
   },
 
-  async uploadImage(file: File) {
+  async uploadImage(file: File, folder?: string) {
     const formData = new FormData();
     formData.append('image', file);
+    if (folder) {
+      formData.append('folder', folder);
+    }
     const res = await fetch(`${API_URL}/upload`, {
       method: 'POST',
       body: formData,

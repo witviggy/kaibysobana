@@ -68,6 +68,34 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create Products Table
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    default_fabric_id INTEGER REFERENCES fabrics(id),
+    base_price NUMERIC(10, 2) DEFAULT 0,
+    description TEXT,
+    image_url TEXT,
+    -- New Fields for Catalog Automation
+    fabric_required NUMERIC(10, 2) DEFAULT 0,
+    stitching_cost NUMERIC(10, 2) DEFAULT 0,
+    price_per_size JSONB DEFAULT '{}',
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Generate sample products
+INSERT INTO products (id, name, default_fabric_id, base_price, description, fabric_required, stitching_cost) VALUES 
+(1, 'Summer Dress', 1, 1800.00, 'Light breathable summer dress.', 1.5, 500.00),
+(2, 'Linen Shirt', 4, 850.00, 'Casual linen shirt for everyday wear.', 1.2, 200.00),
+(3, 'Silk Blouse', 2, 1400.00, 'Elegant silk blouse.', 2.0, 400.00),
+(4, 'Tweed Jacket', 3, 2400.00, 'Warm and stylish tweed jacket.', 2.5, 800.00),
+(5, 'Casual Pant', 4, 3200.00, 'Comfortable linen blend pants.', 1.8, 1000.00),
+(6, 'Denim Skirt', 1, 1650.00, 'Classic blue denim skirt.', 1.0, 450.00);
+
+SELECT setval('products_id_seq', (SELECT MAX(id) FROM products));
+
 -- Create Notifications Table
 CREATE TABLE IF NOT EXISTS notifications (
     id SERIAL PRIMARY KEY,

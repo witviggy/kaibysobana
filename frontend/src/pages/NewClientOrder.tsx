@@ -6,6 +6,7 @@ import { api } from '../services/api';
 import { OrderStatus, Status } from '../types';
 import { useToast } from '../context/ToastContext';
 import { SkeletonLine, SkeletonCard } from '../components/Skeleton';
+import { CustomSelect } from '../components/Select';
 
 const NewClientOrder: React.FC = () => {
     const navigate = useNavigate();
@@ -23,6 +24,7 @@ const NewClientOrder: React.FC = () => {
         // Client Fields
         clientName: '',
         clientPhone: '',
+        clientEmail: '',
         clientAddress: '',
         clientId: '',
 
@@ -41,6 +43,7 @@ const NewClientOrder: React.FC = () => {
         fabricRequired: number;
         fabricCost: number;
         stitchingCost: number;
+        profitMargin: number;
         sellingPrice: number;
     }
 
@@ -52,6 +55,7 @@ const NewClientOrder: React.FC = () => {
         fabricRequired: 0,
         fabricCost: 0,
         stitchingCost: 0,
+        profitMargin: 0,
         sellingPrice: 0
     }]);
 
@@ -78,12 +82,14 @@ const NewClientOrder: React.FC = () => {
                     // Populate main fields
                     let clientName = '';
                     let clientPhone = '';
+                    let clientEmail = '';
                     let clientAddress = '';
                     if (order.clientId) {
                         const client = clientsData.find((c: any) => c.id === order.clientId);
                         if (client) {
                             clientName = client.name || '';
                             clientPhone = client.phone || '';
+                            clientEmail = client.email || '';
                             clientAddress = client.address || '';
                         }
                     }
@@ -91,6 +97,7 @@ const NewClientOrder: React.FC = () => {
                     setFormData({
                         clientName,
                         clientPhone,
+                        clientEmail,
                         clientAddress,
                         clientId: order.clientId,
                         orderDate: order.orderDate,
@@ -103,21 +110,33 @@ const NewClientOrder: React.FC = () => {
                     setCourierCostFromMe(order.courierCostFromMe || 0);
                     setCourierCostToMe(order.courierCostToMe || 0);
 
-                    // Populate Items (Currently GET /orders/:id returns flattened structure for MVP)
-                    // TODO: Update backend to return `items` array.
-                    // For now, if editing an old order, we map flat fields to 1 item.
-                    // If editing new order structure, we need backend support.
-                    // Assuming flat structure for now as migration step:
-                    setItems([{
-                        dressName: order.dressName,
-                        fabricId: order.fabricId,
-                        quantity: order.quantity,
-                        sizeChart: order.sizeChart,
-                        fabricRequired: order.fabricRequired,
-                        fabricCost: order.fabricCost,
-                        stitchingCost: order.stitchingCost,
-                        sellingPrice: order.sellingPrice
-                    }]);
+                    // Populate Items from the new backend array structure, or fallback to legacy flat structure
+                    if (order.items && order.items.length > 0) {
+                        setItems(order.items.map((i: any) => ({
+                            dressName: i.dressName,
+                            fabricId: i.fabricId ? String(i.fabricId) : '',
+                            quantity: Number(i.quantity) || 1,
+                            sizeChart: i.sizeChart || 'M',
+                            fabricRequired: Number(i.fabricRequired) || 0,
+                            fabricCost: Number(i.fabricCost) || 0,
+                            stitchingCost: Number(i.stitchingCost) || 0,
+                            profitMargin: Number(i.profitMargin) || 0,
+                            sellingPrice: Number(i.sellingPrice) || 0
+                        })));
+                    } else if (order.dressName) {
+                        // Legacy single-item order fallback
+                        setItems([{
+                            dressName: order.dressName,
+                            fabricId: order.fabricId ? String(order.fabricId) : '',
+                            quantity: Number(order.quantity) || 1,
+                            sizeChart: order.sizeChart || 'M',
+                            fabricRequired: Number(order.fabricRequired) || 0,
+                            fabricCost: Number(order.fabricCost) || 0,
+                            stitchingCost: Number(order.stitchingCost) || 0,
+                            profitMargin: Number(order.profitMargin) || 0,
+                            sellingPrice: Number(order.sellingPrice) || 0
+                        }]);
+                    }
 
                 } else {
                     if (fabricsData.length > 0) {
@@ -153,6 +172,12 @@ const NewClientOrder: React.FC = () => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
+    const handleAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setFormData(prev => ({ ...prev, clientAddress: e.target.value }));
+        e.target.style.height = 'auto';
+        e.target.style.height = `${e.target.scrollHeight}px`;
+    };
+
     const handleItemChange = (index: number, field: keyof OrderItem, value: any) => {
         const newItems = [...items];
         const oldItem = newItems[index]; // Current state before update
@@ -163,17 +188,50 @@ const NewClientOrder: React.FC = () => {
         // 1. Handle Dress/Product Selection (Auto-Fill)
         if (field === 'dressName') {
             const product = products.find(p => p.name === value);
-            if (product && product.default_fabric_id) {
-                const newFabricId = String(product.default_fabric_id);
-                newItems[index].fabricId = newFabricId;
+            if (product) {
+                // Auto-fill Stitching Cost
+                newItems[index].stitchingCost = Number(product.stitchingCost || product.stitching_cost || 0);
 
-                // If fabric selected, try to set defaults
-                const fabric = fabrics.find(f => String(f.id) === newFabricId);
-                if (fabric) {
-                    const metersPerUnit = Number(fabric.metersPerOutfit) || 0;
-                    if (metersPerUnit > 0) {
-                        newItems[index].fabricRequired = metersPerUnit * newItems[index].quantity;
+                if (product.default_fabric_id || product.defaultFabricId) {
+                    const newFabricId = String(product.default_fabric_id || product.defaultFabricId);
+                    newItems[index].fabricId = newFabricId;
 
+                    // If fabric selected, calculate req and cost
+                    const fabric = fabrics.find(f => String(f.id) === newFabricId);
+                    if (fabric) {
+                        const price = Number(fabric.pricePerMeter) || 0;
+
+                        // Check for size-wise Requirement
+                        const fabricPerSize = typeof (product.fabricPerSize || product.fabric_per_size) === 'string'
+                            ? JSON.parse(product.fabricPerSize || product.fabric_per_size || '{}')
+                            : (product.fabricPerSize || product.fabric_per_size || {});
+
+                        let reqPerUnit = Number(product.fabricRequired || product.fabric_required || 0);
+                        if (Object.keys(fabricPerSize).length > 0 && fabricPerSize[newItems[index].sizeChart]) {
+                            reqPerUnit = Number(fabricPerSize[newItems[index].sizeChart]);
+                        }
+
+                        newItems[index].fabricRequired = reqPerUnit * newItems[index].quantity;
+                        newItems[index].fabricCost = Number((newItems[index].fabricRequired * price).toFixed(2));
+                    }
+                }
+            }
+        }
+
+        // 1.5 Handle Size Change -> Auto-Update Fabric Req if Dress has Size-Wise
+        if (field === 'sizeChart') {
+            const product = products.find(p => p.name === newItems[index].dressName);
+            if (product) {
+                const fabricPerSize = typeof (product.fabricPerSize || product.fabric_per_size) === 'string'
+                    ? JSON.parse(product.fabricPerSize || product.fabric_per_size || '{}')
+                    : (product.fabricPerSize || product.fabric_per_size || {});
+
+                if (Object.keys(fabricPerSize).length > 0 && fabricPerSize[value]) {
+                    const reqPerUnit = Number(fabricPerSize[value]);
+                    newItems[index].fabricRequired = reqPerUnit * newItems[index].quantity;
+
+                    const fabric = fabrics.find(f => String(f.id) === String(newItems[index].fabricId));
+                    if (fabric) {
                         const price = Number(fabric.pricePerMeter) || 0;
                         newItems[index].fabricCost = Number((newItems[index].fabricRequired * price).toFixed(2));
                     }
@@ -210,16 +268,8 @@ const NewClientOrder: React.FC = () => {
             const fabric = fabrics.find(f => String(f.id) === String(value));
             if (fabric) {
                 const price = Number(fabric.pricePerMeter) || 0;
-                // If Fabric Req is 0, maybe try to populate from default?
-                if (newItems[index].fabricRequired === 0 && fabric.metersPerOutfit) {
-                    const metersPerUnit = Number(fabric.metersPerOutfit) || 0;
-                    const newTotalReq = metersPerUnit * newItems[index].quantity;
-                    newItems[index].fabricRequired = newTotalReq;
-                    newItems[index].fabricCost = Number((newTotalReq * price).toFixed(2));
-                } else {
-                    // Just update cost based on existing req
-                    newItems[index].fabricCost = Number((newItems[index].fabricRequired * price).toFixed(2));
-                }
+                // Just update cost based on existing req
+                newItems[index].fabricCost = Number((newItems[index].fabricRequired * price).toFixed(2));
             }
         }
 
@@ -231,6 +281,25 @@ const NewClientOrder: React.FC = () => {
                 const price = Number(fabric.pricePerMeter) || 0;
                 newItems[index].fabricCost = Number((newReq * price).toFixed(2));
             }
+        }
+
+        // 5. Profit Margin Handling (Bidirectional)
+        if (field === 'sellingPrice') {
+            const cost = Number(newItems[index].fabricCost) + Number(newItems[index].stitchingCost);
+            const selling = Number(value);
+            if (cost > 0 && selling > cost) {
+                const profit = selling - cost;
+                const margin = (profit / cost) * 100;
+                newItems[index].profitMargin = Number(margin.toFixed(2));
+            } else {
+                newItems[index].profitMargin = 0;
+            }
+        } else {
+            // Apply profit margin to calculate selling price for ANY change except manual sellingPrice change
+            const cost = Number(newItems[index].fabricCost) + Number(newItems[index].stitchingCost);
+            const margin = Number(newItems[index].profitMargin) || 0;
+            const markupAmount = cost * (margin / 100);
+            newItems[index].sellingPrice = Number((cost + markupAmount).toFixed(2));
         }
 
         setItems(newItems);
@@ -245,6 +314,7 @@ const NewClientOrder: React.FC = () => {
             fabricRequired: 0,
             fabricCost: 0,
             stitchingCost: 0,
+            profitMargin: 0,
             sellingPrice: 0
         }]);
     };
@@ -256,16 +326,40 @@ const NewClientOrder: React.FC = () => {
         }
     };
 
-    // Calculations
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalFabricCost = items.reduce((sum, item) => sum + (item.fabricCost || 0), 0);
-    const totalStitchingCost = items.reduce((sum, item) => sum + (item.stitchingCost || 0), 0);
-    const totalSellingPrice = items.reduce((sum, item) => sum + (item.sellingPrice || 0), 0);
-    const totalCosts = totalFabricCost + totalStitchingCost + courierCostFromMe + courierCostToMe;
-    const netProfit = totalSellingPrice - totalCosts;
+    // Calculations strictly as numbers to avoid string concatenation bugs
+    const totalQuantity = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+    const totalFabricCost = items.reduce((sum, item) => sum + (Number(item.fabricCost) || 0), 0);
+    const totalStitchingCost = items.reduce((sum, item) => sum + (Number(item.stitchingCost) || 0), 0);
+    const totalSellingPrice = items.reduce((sum, item) => sum + (Number(item.sellingPrice) || 0), 0);
+    const numCourierFrom = Number(courierCostFromMe) || 0;
+    const numCourierTo = Number(courierCostToMe) || 0;
+
+    const totalCosts = totalFabricCost + totalStitchingCost + numCourierFrom + numCourierTo;
+
+    // Revenue collected matches Items (Selling Price) + Logistics (Delivery Charge).
+    // Our Costs matches Materials + Logistics (Courier Cost).
+    // The logistics charges cancel out, so Profit = Items Selling Price - Items Costs
+    const netProfit = totalSellingPrice - (totalFabricCost + totalStitchingCost);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validations
+        if (formData.clientPhone) {
+            const phoneRegex = /^[0-9]{10}$/;
+            if (!phoneRegex.test(formData.clientPhone.replace(/\D/g, ''))) {
+                addToast("Please enter a valid 10-digit mobile number.", 'error');
+                return;
+            }
+        }
+        if (formData.clientEmail) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(formData.clientEmail)) {
+                addToast("Please enter a valid email address.", 'error');
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         try {
             // 1. Client Logic
@@ -274,9 +368,11 @@ const NewClientOrder: React.FC = () => {
 
             if (existingClient) {
                 finalClientId = existingClient.id;
-                if (formData.clientPhone || formData.clientAddress) {
+                if (formData.clientPhone || formData.clientAddress || formData.clientEmail) {
                     await api.updateClient(finalClientId, {
+                        name: existingClient.name,
                         phone: formData.clientPhone,
+                        email: formData.clientEmail,
                         address: formData.clientAddress
                     });
                 }
@@ -285,7 +381,7 @@ const NewClientOrder: React.FC = () => {
                     name: formData.clientName,
                     phone: formData.clientPhone,
                     address: formData.clientAddress,
-                    email: '',
+                    email: formData.clientEmail,
                     status: Status.Active
                 });
                 finalClientId = newClientRes.id;
@@ -294,6 +390,8 @@ const NewClientOrder: React.FC = () => {
             const payload = {
                 ...formData,
                 clientId: finalClientId,
+                clientPhone: formData.clientPhone, // Override with properly formatted phone
+                clientEmail: formData.clientEmail,
                 items,
                 courierCostFromMe,
                 courierCostToMe,
@@ -354,30 +452,166 @@ const NewClientOrder: React.FC = () => {
                         <h3 className="text-base font-semibold text-zinc-900 mb-4 flex items-center gap-2">
                             <User size={16} className="text-zinc-500" /> Customer
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <input
-                                required
-                                placeholder="Client Name"
-                                className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                value={formData.clientName}
-                                onChange={e => handleClientInfoChange('clientName', e.target.value)}
-                            />
-                            <input
-                                placeholder="Phone"
-                                className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                value={formData.clientPhone}
-                                onChange={e => handleClientInfoChange('clientPhone', e.target.value)}
-                            />
-                            <input
-                                placeholder="Address"
-                                className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm sm:col-span-2"
-                                value={formData.clientAddress}
-                                onChange={e => handleClientInfoChange('clientAddress', e.target.value)}
-                            />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="text-sm font-medium text-zinc-700 block mb-1">Client Name</label>
+                                <input
+                                    required
+                                    placeholder="e.g. Sobana"
+                                    className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
+                                    value={formData.clientName}
+                                    onChange={e => handleClientInfoChange('clientName', e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-zinc-700 block mb-1">Phone</label>
+                                <input
+                                    type="tel"
+                                    maxLength={10}
+                                    placeholder="9876543210"
+                                    className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
+                                    value={formData.clientPhone}
+                                    onChange={e => handleClientInfoChange('clientPhone', e.target.value.replace(/\D/g, ''))}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-zinc-700 block mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    placeholder="client@example.com"
+                                    className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
+                                    value={formData.clientEmail}
+                                    onChange={e => handleClientInfoChange('clientEmail', e.target.value)}
+                                />
+                            </div>
+                            <div className="sm:col-span-3">
+                                <label className="text-sm font-medium text-zinc-700 block mb-1">Address</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Full address including pin code"
+                                    className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm resize-none overflow-hidden"
+                                    value={formData.clientAddress}
+                                    onChange={handleAddressChange}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* Order Dates */}
+
+
+                    {/* Order Items */}
+                    <div className="space-y-4">
+                        {items.map((item, index) => (
+                            <div key={index} className="bg-white rounded-lg border border-zinc-200 p-6 relative group transition-shadow hover:shadow-md">
+                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button type="button" onClick={() => removeItem(index)} className="text-red-400 hover:text-red-600">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                                <h4 className="text-sm font-semibold text-zinc-900 mb-4">Item #{index + 1}</h4>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Dress Type</label>
+                                        <CustomSelect
+                                            value={item.dressName}
+                                            onChange={val => handleItemChange(index, 'dressName', val)}
+                                            options={products.map(p => ({ value: p.name, label: p.name }))}
+                                            placeholder="Select Dress Type"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Fabric</label>
+                                        <CustomSelect
+                                            value={item.fabricId}
+                                            onChange={val => handleItemChange(index, 'fabricId', val)}
+                                            options={fabrics.map(f => ({ value: f.id, label: `${f.name} (${f.color})` }))}
+                                            placeholder="Select Fabric"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Quantity</label>
+                                        <input
+                                            type="number" min="1" required
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
+                                            value={item.quantity}
+                                            onChange={e => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Size</label>
+                                        <CustomSelect
+                                            value={item.sizeChart}
+                                            onChange={val => handleItemChange(index, 'sizeChart', val)}
+                                            options={SIZES.map(s => ({ value: s, label: s }))}
+                                            placeholder="Size"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Fabric Req (m)</label>
+                                        <input
+                                            type="number" step="0.01" min="0"
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
+                                            value={item.fabricRequired}
+                                            onChange={e => handleItemChange(index, 'fabricRequired', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-zinc-100">
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Fabric Cost</label>
+                                        <input
+                                            type="number" min="0" required
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white"
+                                            value={item.fabricCost}
+                                            onChange={e => handleItemChange(index, 'fabricCost', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Stitching Cost</label>
+                                        <input
+                                            type="number" min="0" required
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white"
+                                            value={item.stitchingCost}
+                                            onChange={e => handleItemChange(index, 'stitchingCost', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Profit Margin (%)</label>
+                                        <input
+                                            type="number" min="0"
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white"
+                                            value={item.profitMargin}
+                                            onChange={e => handleItemChange(index, 'profitMargin', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Selling Price</label>
+                                        <input
+                                            type="number" min="0" required
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white font-medium text-zinc-900 border-zinc-400"
+                                            value={item.sellingPrice}
+                                            onChange={e => handleItemChange(index, 'sellingPrice', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={addItem}
+                        className="w-full py-3 border-2 border-dashed border-zinc-300 rounded-lg text-zinc-500 font-medium hover:border-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Plus size={20} /> Add Another Dress
+                    </button>
+
+                    {/* Order Dates (Logistics) */}
                     <div className="bg-white rounded-lg border border-zinc-200 p-6">
                         <h3 className="text-base font-semibold text-zinc-900 mb-4 flex items-center gap-2">
                             <Truck size={16} className="text-zinc-500" /> Logistics
@@ -406,130 +640,17 @@ const NewClientOrder: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Order Items */}
-                    <div className="space-y-4">
-                        {items.map((item, index) => (
-                            <div key={index} className="bg-white rounded-lg border border-zinc-200 p-6 relative group transition-shadow hover:shadow-md">
-                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button type="button" onClick={() => removeItem(index)} className="text-red-400 hover:text-red-600">
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                                <h4 className="text-sm font-semibold text-zinc-900 mb-4">Item #{index + 1}</h4>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Dress Type</label>
-                                        <input
-                                            list={`products-${index}`}
-                                            required
-                                            placeholder="Select or type..."
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                            value={item.dressName}
-                                            onChange={e => handleItemChange(index, 'dressName', e.target.value)}
-                                        />
-                                        <datalist id={`products-${index}`}>
-                                            {products.map(p => <option key={p.id} value={p.name} />)}
-                                        </datalist>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Fabric</label>
-                                        <select
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                            value={item.fabricId}
-                                            onChange={e => handleItemChange(index, 'fabricId', e.target.value)}
-                                        >
-                                            {fabrics.map(f => (
-                                                <option key={f.id} value={f.id}>{f.name} ({f.color})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Quantity</label>
-                                        <input
-                                            type="number" min="1" required
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                            value={item.quantity}
-                                            onChange={e => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Size</label>
-                                        <select
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                            value={item.sizeChart}
-                                            onChange={e => handleItemChange(index, 'sizeChart', e.target.value)}
-                                        >
-                                            {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Fabric Req (m)</label>
-                                        <input
-                                            type="number" step="0.01" min="0"
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
-                                            value={item.fabricRequired}
-                                            onChange={e => handleItemChange(index, 'fabricRequired', parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-zinc-100 bg-zinc-50/50 p-3 rounded-md">
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Fabric Cost</label>
-                                        <input
-                                            type="number" min="0" required
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white"
-                                            value={item.fabricCost}
-                                            onChange={e => handleItemChange(index, 'fabricCost', parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Stitching Cost</label>
-                                        <input
-                                            type="number" min="0" required
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white"
-                                            value={item.stitchingCost}
-                                            onChange={e => handleItemChange(index, 'stitchingCost', parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-zinc-500 mb-1 block">Selling Price</label>
-                                        <input
-                                            type="number" min="0" required
-                                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm bg-white font-medium text-zinc-900 border-zinc-400"
-                                            value={item.sellingPrice}
-                                            onChange={e => handleItemChange(index, 'sellingPrice', parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={addItem}
-                        className="w-full py-3 border-2 border-dashed border-zinc-300 rounded-lg text-zinc-500 font-medium hover:border-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-2"
-                    >
-                        <Plus size={20} /> Add Another Dress
-                    </button>
-
                     {/* Common Fields */}
-                    <div className="bg-white rounded-lg border border-zinc-200 p-6">
+                    <div className="bg-white rounded-lg border border-zinc-200 p-6 mt-6">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <label className="text-sm font-medium text-zinc-700 block mb-1">Status</label>
-                                <select
-                                    className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
+                                <CustomSelect
                                     value={formData.status}
-                                    onChange={e => setFormData({ ...formData, status: e.target.value as OrderStatus })}
-                                >
-                                    {Object.values(OrderStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                                    onChange={val => setFormData({ ...formData, status: val as OrderStatus })}
+                                    options={Object.values(OrderStatus).map(s => ({ value: s, label: s }))}
+                                    placeholder="Order Status"
+                                />
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-zinc-700 block mb-1">Courier (From Me)</label>
@@ -575,21 +696,30 @@ const NewClientOrder: React.FC = () => {
                                 <span>{totalQuantity}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-zinc-400">Total Revenue</span>
-                                <span className="font-medium text-lg">₹{totalSellingPrice.toLocaleString()}</span>
+                                <span className="text-zinc-400">Items Revenue</span>
+                                <span className="font-medium">₹{totalSellingPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-zinc-400">Delivery Charges</span>
+                                <span className="font-medium">₹{(numCourierFrom + numCourierTo).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="h-px bg-white/10 my-2" />
+                            <div className="flex justify-between font-bold text-lg">
+                                <span>Total Bill</span>
+                                <span>₹{(totalSellingPrice + numCourierFrom + numCourierTo).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                             </div>
                             <div className="h-px bg-white/10 my-2" />
                             <div className="flex justify-between text-zinc-400 text-xs">
                                 <span>Fabric + Stitching</span>
-                                <span>₹{totalFabricCost + totalStitchingCost}</span>
+                                <span>₹{(totalFabricCost + totalStitchingCost).toLocaleString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between text-zinc-400 text-xs">
                                 <span>Courier</span>
-                                <span>₹{courierCostFromMe + courierCostToMe}</span>
+                                <span>₹{(numCourierFrom + numCourierTo).toLocaleString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between font-bold pt-2 mt-2 border-t border-white/10">
                                 <span>Net Profit</span>
-                                <span className={netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>₹{netProfit.toLocaleString()}</span>
+                                <span className={netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}>₹{netProfit.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
 
@@ -598,11 +728,10 @@ const NewClientOrder: React.FC = () => {
                             disabled={isSubmitting}
                             className="w-full mt-6 py-3 bg-white text-zinc-900 rounded-md font-bold hover:bg-zinc-200 transition-colors"
                         >
-                            {isSubmitting ? 'Saving...' : 'Confirm Order'}
+                            {isSubmitting ? 'Saving...' : id ? 'Save Order' : 'Confirm Order'}
                         </button>
                     </div>
                 </div>
-
             </form>
         </div>
     );

@@ -6,7 +6,6 @@ export enum Status {
 
 export enum OrderStatus {
   Pending = 'Pending',
-  InProgress = 'In Progress',
   Completed = 'Completed',
   Cancelled = 'Cancelled',
 }
@@ -82,7 +81,9 @@ export interface Order {
   courierCostFromMe?: number; // Courier cost sent by me
   courierCostToMe?: number;   // Courier cost sent to me
   profit: number;
+  profitMargin?: number;
   remarks?: string;
+  items?: any[];
 }
 
 export interface Notification {

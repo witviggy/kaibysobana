@@ -54,8 +54,8 @@ const FabricDetail: React.FC = () => {
             await api.deleteFabric(id);
             addToast("Fabric deleted successfully", 'success');
             navigate('/stock');
-        } catch (error) {
-            addToast("Failed to delete fabric", 'error');
+        } catch (error: any) {
+            addToast(error.message || "Failed to delete fabric", 'error');
         }
     };
 
@@ -117,7 +117,7 @@ const FabricDetail: React.FC = () => {
                     </div>
                 )}
 
-                <div className="grid grid-cols-3 gap-4 mb-5">
+                <div className="grid grid-cols-2 gap-4 mb-5">
                     <div className="p-3 bg-zinc-50 rounded-md border border-zinc-100">
                         <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Current Stock</label>
                         <div className="text-lg font-semibold text-zinc-900 mt-0.5">{fabric.metersAvailable} m</div>
@@ -125,10 +125,6 @@ const FabricDetail: React.FC = () => {
                     <div className="p-3 bg-zinc-50 rounded-md border border-zinc-100">
                         <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Price per Meter</label>
                         <div className="text-lg font-semibold text-zinc-900 mt-0.5">₹{fabric.pricePerMeter}</div>
-                    </div>
-                    <div className="p-3 bg-zinc-50 rounded-md border border-zinc-100">
-                        <label className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Usage / Outfit</label>
-                        <div className="text-base font-medium text-zinc-900 mt-0.5">{fabric.metersPerOutfit} m</div>
                     </div>
                 </div>
 
