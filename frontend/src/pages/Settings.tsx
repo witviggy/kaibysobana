@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { User, Bell, Shield, Wallet, Save, RefreshCw, CheckCircle, Camera, X, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { User, Bell, Shield, Wallet, Save, RefreshCw, CheckCircle, Camera, X, UserPlus, Eye, EyeOff, Edit2, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +42,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     const [addingMember, setAddingMember] = useState(false);
     const [showMemberPassword, setShowMemberPassword] = useState(false);
 
+    // Edit member state
+    const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
+    const [editMemberPassword, setEditMemberPassword] = useState('');
+
+    // Delete member confirmation state
+    const [deletingMemberId, setDeletingMemberId] = useState<number | null>(null);
+    const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+
+    // Role dropdown state
+    const [openRoleDropdownId, setOpenRoleDropdownId] = useState<number | null>(null);
+
     // Global App Settings
     const [appSettings, setAppSettings] = useState({ appName: '', logoUrl: '' });
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -68,7 +79,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     }
                 });
                 // Fetch members if admin
-                if (data.role === 'admin') {
+                if (data.role?.toLowerCase() === 'admin') {
                     try {
                         const users = await api.getUsers();
                         setMembers(users);
@@ -160,6 +171,48 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         }
     };
 
+    const confirmDeleteMember = async (id: number) => {
+        if (deleteConfirmationText.toLowerCase() !== 'delete') {
+            addToast("Type 'delete' to confirm", "error");
+            return;
+        }
+        try {
+            await api.deleteUser(id);
+            setMembers(members.filter(m => m.id !== id));
+            setDeletingMemberId(null);
+            setDeleteConfirmationText('');
+            addToast("Member removed", "success");
+        } catch (error: any) {
+            addToast(error.message || "Failed to remove member", "error");
+        }
+    };
+
+    const handleChangeMemberRole = async (id: number, newRole: string) => {
+        setOpenRoleDropdownId(null);
+        try {
+            await api.changeUserRole(id, newRole);
+            setMembers(members.map(m => m.id === id ? { ...m, role: newRole } : m));
+            addToast("Role updated", "success");
+        } catch (error: any) {
+            addToast(error.message || "Failed to update role", "error");
+        }
+    };
+
+    const handleSaveMemberPassword = async (id: number) => {
+        if (editMemberPassword.length < 6) {
+            addToast("Password must be at least 6 characters", "error");
+            return;
+        }
+        try {
+            await api.changePassword(id, { newPassword: editMemberPassword });
+            setEditingMemberId(null);
+            setEditMemberPassword('');
+            addToast("Password updated", "success");
+        } catch (error: any) {
+            addToast(error.message || "Failed to update password", "error");
+        }
+    };
+
     const tabs = [
         { id: 'profile', label: 'Profile', icon: User },
         { id: 'security', label: 'Security', icon: Shield },
@@ -217,9 +270,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                         <RefreshCw size={24} className="animate-spin text-zinc-400" />
                     </div>
                 ) : (
-                    <div className="flex flex-1 min-h-0">
+                    <div className="flex flex-col md:flex-row flex-1 min-h-0">
                         {/* Tab Sidebar */}
-                        <div className="w-44 shrink-0 border-r border-zinc-100 bg-zinc-50/50 p-3 space-y-0.5">
+                        <div className="w-full md:w-44 shrink-0 border-b md:border-b-0 md:border-r border-zinc-100 bg-zinc-50/50 p-2 md:p-3 overflow-x-auto flex flex-row md:flex-col gap-1 md:gap-0 md:space-y-0.5">
                             {tabs.map((tab) => {
                                 const Icon = tab.icon;
                                 const isActive = activeTab === tab.id;
@@ -227,7 +280,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive
+                                        className={`shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive
                                             ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200'
                                             : 'text-zinc-500 hover:bg-white/60 hover:text-zinc-700'
                                             }`}
@@ -290,7 +343,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {isAdmin && (
                                         <div className="space-y-5 pt-5 border-t border-zinc-100 mt-6">
                                             <h3 className="text-sm font-semibold text-zinc-900">Application Configuration</h3>
-                                            <div className="grid grid-cols-2 gap-5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-zinc-600">Application Name</label>
                                                     <input type="text" value={appSettings.appName || ''} onChange={(e) => setAppSettings({ ...appSettings, appName: e.target.value })} placeholder="e.g. கை(kai)" className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
@@ -373,7 +426,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                         <h3 className="text-sm font-semibold text-zinc-900 mb-1">Add New Member</h3>
                                         <p className="text-xs text-zinc-500 mb-5">Create a new account for a team member.</p>
                                         <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-zinc-600">Full Name</label>
                                                     <input type="text" value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })} placeholder="John Doe" className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
@@ -383,7 +436,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                                     <input type="email" value={newMember.email} onChange={(e) => setNewMember({ ...newMember, email: e.target.value })} placeholder="john@kai.com" className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500" />
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-zinc-600">Password</label>
                                                     <div className="relative">
@@ -414,17 +467,93 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                             <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Team Members ({members.length})</h4>
                                             <div className="space-y-2 max-h-40 overflow-y-auto">
                                                 {members.map(m => (
-                                                    <div key={m.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-md border border-zinc-100">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center overflow-hidden">
-                                                                {m.avatarUrl ? <img src={m.avatarUrl} className="w-full h-full object-cover" /> : <User size={14} className="text-zinc-500" />}
+                                                    <div key={m.id} className="flex flex-col gap-2 p-3 bg-zinc-50 rounded-md border border-zinc-100">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center overflow-hidden shrink-0">
+                                                                    {m.avatarUrl ? <img src={m.avatarUrl} className="w-full h-full object-cover" /> : <User size={14} className="text-zinc-500" />}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-zinc-900">{m.name}</p>
+                                                                    <p className="text-xs text-zinc-500">{m.email}</p>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <p className="text-sm font-medium text-zinc-900">{m.name}</p>
-                                                                <p className="text-xs text-zinc-500">{m.email}</p>
+                                                            <div className="flex items-center gap-2 relative">
+                                                                <div className="relative">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setOpenRoleDropdownId(openRoleDropdownId === m.id ? null : m.id)}
+                                                                        disabled={user.id === m.id}
+                                                                        className={`flex items-center justify-between gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded border border-transparent hover:border-zinc-200 transition-colors ${m.role.toLowerCase() === 'admin' ? 'bg-amber-50 text-amber-700' : 'bg-zinc-100 text-zinc-600'} ${user.id === m.id ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                    >
+                                                                        <span>{m.role}</span>
+                                                                    </button>
+                                                                    {openRoleDropdownId === m.id && (
+                                                                        <div className="absolute top-full left-0 mt-1 w-28 bg-white border border-zinc-200 rounded-md shadow-lg py-1 z-50">
+                                                                            <button
+                                                                                onClick={() => handleChangeMemberRole(m.id, 'admin')}
+                                                                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                                                                            >
+                                                                                Admin
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleChangeMemberRole(m.id, 'member')}
+                                                                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                                                                            >
+                                                                                Member
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {user.id !== m.id && (
+                                                                    <>
+                                                                        <button onClick={() => { setEditingMemberId(editingMemberId === m.id ? null : m.id); setDeletingMemberId(null); }} className="p-1 text-zinc-400 hover:text-zinc-600 bg-white rounded shadow-sm border border-zinc-200 ml-1">
+                                                                            <Edit2 size={12} />
+                                                                        </button>
+                                                                        <button onClick={() => { setDeletingMemberId(deletingMemberId === m.id ? null : m.id); setEditingMemberId(null); setDeleteConfirmationText(''); }} className="p-1 text-red-400 hover:text-red-600 bg-white rounded shadow-sm border border-zinc-200">
+                                                                            <Trash2 size={12} />
+                                                                        </button>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-amber-50 text-amber-700' : 'bg-zinc-100 text-zinc-600'}`}>{m.role}</span>
+                                                        {editingMemberId === m.id && (
+                                                            <div className="flex items-center gap-2 mt-1 pt-2 border-t border-zinc-100 animate-fade-in pl-11">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="New Password"
+                                                                    value={editMemberPassword}
+                                                                    onChange={e => setEditMemberPassword(e.target.value)}
+                                                                    className="flex-1 px-2 py-1.5 text-xs border border-zinc-300 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                                                />
+                                                                <button
+                                                                    onClick={() => handleSaveMemberPassword(m.id)}
+                                                                    className="px-3 py-1.5 bg-zinc-900 text-white rounded-md text-xs font-medium shrink-0 hover:bg-black"
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {deletingMemberId === m.id && (
+                                                            <div className="flex flex-col gap-2 mt-1 pt-2 border-t border-zinc-100 animate-fade-in pl-11">
+                                                                <p className="text-xs text-red-600 font-medium">Type "delete" to confirm removal</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="delete"
+                                                                        value={deleteConfirmationText}
+                                                                        onChange={e => setDeleteConfirmationText(e.target.value)}
+                                                                        className="flex-1 px-2 py-1.5 text-xs border border-zinc-300 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => confirmDeleteMember(m.id)}
+                                                                        className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium shrink-0 hover:bg-red-700"
+                                                                    >
+                                                                        Confirm
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

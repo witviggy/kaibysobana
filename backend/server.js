@@ -387,7 +387,7 @@ app.get('/api/users', verifyToken, async (req, res) => {
   try {
     // Check if requesting user is admin
     const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
-    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role.toLowerCase() !== 'admin') {
       return res.status(403).json({ message: 'Admin access required' });
     }
     const result = await pool.query(
@@ -405,7 +405,7 @@ app.post('/api/users', verifyToken, async (req, res) => {
   try {
     // Check if requesting user is admin
     const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
-    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role.toLowerCase() !== 'admin') {
       return res.status(403).json({ message: 'Admin access required' });
     }
     const { name, email, password, role } = req.body;
@@ -443,7 +443,7 @@ app.put('/api/users/:id/password', verifyToken, async (req, res) => {
     const requestingUserId = req.user.id;
     // Check if admin or self
     const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [requestingUserId]);
-    const isAdmin = adminCheck.rows.length > 0 && adminCheck.rows[0].role === 'admin';
+    const isAdmin = adminCheck.rows.length > 0 && (adminCheck.rows[0].role || '').toLowerCase() === 'admin';
     if (!isAdmin && requestingUserId !== targetUserId) {
       return res.status(403).json({ message: 'Not authorized to change this password' });
     }
@@ -468,6 +468,70 @@ app.put('/api/users/:id/password', verifyToken, async (req, res) => {
     res.json({ message: 'Password updated successfully' });
   } catch (err) {
     console.error('❌ Error changing password:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update user role (admin only)
+app.put('/api/users/:id/role', verifyToken, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.id);
+    const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (adminCheck.rows.length === 0 || (adminCheck.rows[0].role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const { role } = req.body;
+    if (role !== 'admin' && role !== 'member') {
+      return res.status(400).json({ message: 'Invalid role provided' });
+    }
+
+    // Prevent removing the last admin
+    if (role === 'member') {
+      const adminCount = await pool.query("SELECT count(*) FROM users WHERE LOWER(role) = 'admin'");
+      if (parseInt(adminCount.rows[0].count) <= 1) {
+        const targetCheck = await pool.query("SELECT role FROM users WHERE id = $1", [targetUserId]);
+        if (targetCheck.rows.length > 0 && targetCheck.rows[0].role.toLowerCase() === 'admin') {
+          return res.status(400).json({ message: 'Cannot demote the only admin' });
+        }
+      }
+    }
+
+    const updated = await pool.query(
+      'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, name, email, role, nickname, avatar_url as "avatarUrl", created_at as "createdAt"',
+      [role, targetUserId]
+    );
+
+    if (updated.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    await logActivity('UPDATE', 'USER', targetUserId, JSON.stringify({ role }));
+    res.json(updated.rows[0]);
+  } catch (err) {
+    console.error('❌ Error updating user role:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Delete user (admin only)
+app.delete('/api/users/:id', verifyToken, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.id);
+    const adminCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (adminCheck.rows.length === 0 || (adminCheck.rows[0].role || '').toLowerCase() !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    if (req.user.id === targetUserId) {
+      return res.status(400).json({ message: 'You cannot delete yourself' });
+    }
+
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [targetUserId]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    await logActivity('DELETE', 'USER', targetUserId, '{}');
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('❌ Error deleting user:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -1066,7 +1130,11 @@ app.get('/api/orders', async (req, res) => {
       TO_CHAR(o.delivery_date, 'YYYY-MM-DD') as "deliveryDate",
       o.total_cost as "totalCost",
       o.selling_price as "sellingPrice",
-      o.profit
+      o.profit,
+      o.fabric_cost as "fabricCost",
+      o.stitching_cost as "stitchingCost",
+      o.courier_cost_from_me as "courierCostFromMe",
+      o.courier_cost_to_me as "courierCostToMe"
       FROM orders o
       JOIN clients c ON o.client_id = c.id
       JOIN fabrics f ON o.fabric_id = f.id

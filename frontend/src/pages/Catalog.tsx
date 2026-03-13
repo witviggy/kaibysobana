@@ -118,16 +118,16 @@ const Catalog: React.FC = () => {
 
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-12">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Dress Catalog</h1>
                     <p className="text-sm text-zinc-500">Manage dress types and default fabrics.</p>
                 </div>
                 <button
                     onClick={() => openModal()}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm font-medium hover:bg-black transition-colors shrink-0"
                 >
-                    <Plus size={16} /> New Dress
+                    <Plus size={16} /> Add Dress
                 </button>
             </div>
 

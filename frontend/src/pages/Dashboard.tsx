@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
   const expenseBreakdown = [
     { name: 'Fabric Cost', value: filteredOrders.reduce((acc, c) => acc + parseFloat(c.fabricCost || '0'), 0), color: '#f59e0b' },
     { name: 'Stitching', value: filteredOrders.reduce((acc, c) => acc + parseFloat(c.stitchingCost || '0'), 0), color: '#ec4899' },
-    { name: 'Courier', value: filteredOrders.reduce((acc, c) => acc + parseFloat(c.courierCostFromMe || '0') + parseFloat(c.courierCostToMe || '0'), 0), color: '#6366f1' },
+    { name: 'Courier', value: filteredOrders.reduce((acc, c) => acc + parseFloat(c.courierCostFromMe?.toString() || '0') + parseFloat(c.courierCostToMe?.toString() || '0'), 0), color: '#6366f1' },
     { name: 'Other', value: totalCost * 0.05, color: '#8b5cf6' }, // Approx remnant
   ];
 

@@ -227,6 +227,23 @@ export const api = {
     return handleResponse(res);
   },
 
+  changeUserRole: async (userId: number, role: string) => {
+    const res = await fetch(`${API_URL}/users/${userId}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ role }),
+    });
+    return handleResponse(res);
+  },
+
+  deleteUser: async (userId: number) => {
+    const res = await fetch(`${API_URL}/users/${userId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
   deleteClient: async (id: string) => {
     const res = await fetch(`${API_URL}/clients/${id}`, {
       method: 'DELETE',
