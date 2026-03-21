@@ -582,9 +582,22 @@ const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
+console.log('📂 Uploads directory:', UPLOADS_DIR);
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(UPLOADS_DIR));
+// Serve uploaded files statically under /api/uploads so production reverse proxy routes them to backend
+app.use('/api/uploads', express.static(UPLOADS_DIR));
+
+// Test endpoint to verify uploads dir is accessible
+app.get('/api/test/uploads', (req, res) => {
+  const uploadsExist = fs.existsSync(UPLOADS_DIR);
+  const files = uploadsExist ? fs.readdirSync(UPLOADS_DIR, { recursive: true }) : [];
+  res.json({
+    uploadsPath: UPLOADS_DIR,
+    exists: uploadsExist,
+    files: files,
+    canServe: `GET /api/uploads/{filename}`
+  });
+});
 
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
@@ -633,8 +646,8 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       const filePath = path.join(targetDir, fileName);
       fs.writeFileSync(filePath, req.file.buffer);
 
-      // Return RELATIVE URL - frontend will construct full URL based on current API_URL
-      const relativeUrl = folder ? `/uploads/${folder}/${fileName}` : `/uploads/${fileName}`;
+      // Return RELATIVE URL under /api/uploads so production proxy routes to backend
+      const relativeUrl = folder ? `/api/uploads/${folder}/${fileName}` : `/api/uploads/${fileName}`;
       console.log('✅ File saved locally:', relativeUrl);
       console.log('   Physical path:', filePath);
       return res.json({ url: relativeUrl });

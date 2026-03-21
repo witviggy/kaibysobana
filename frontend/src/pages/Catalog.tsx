@@ -137,7 +137,15 @@ const Catalog: React.FC = () => {
                         {/* Product Image */}
                         <div className="h-36 bg-zinc-100 relative flex items-center justify-center overflow-hidden">
                             {(product.imageUrl || product.image_url) ? (
-                                <img src={getMediaUrl(product.imageUrl || product.image_url)} alt={product.name} className="w-full h-full object-cover" />
+                                <>
+                                  <img 
+                                    src={getMediaUrl(product.imageUrl || product.image_url)} 
+                                    alt={product.name} 
+                                    className="w-full h-full object-cover" 
+                                    onError={(e) => console.error(`❌ Image failed to load: ${(e.target as HTMLImageElement).src}`)}
+                                    onLoad={() => console.log(`✅ Image loaded: ${product.imageUrl || product.image_url}`)}
+                                  />
+                                </>
                             ) : (
                                 <ShoppingBag size={32} className="text-zinc-300" />
                             )}

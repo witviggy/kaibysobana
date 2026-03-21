@@ -52,7 +52,7 @@ services:
       - BACKEND_URL=${BACKEND_URL:-http://localhost:5000}
       - JWT_SECRET=${JWT_SECRET:-kai_dev_jwt_secret_key_change_in_production}
     volumes:
-      - uploads_data:/app/uploads
+      - ./backend/uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,7 +78,6 @@ services:
 
 volumes:
   postgres_data:
-  uploads_data:
 
 networks:
   stitchflow-network:

@@ -29,9 +29,13 @@ const handleResponse = async (response: Response) => {
 export const getMediaUrl = (path?: string) => {
   if (!path) return '';
   if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')) return path;
-  // Assuming backend is at config.API_URL
-  const baseUrl = config.API_URL.replace('/api', '');
-  return `${baseUrl}${path}`;
+  
+  // Backend serves uploads at /api/uploads/...
+  // VITE_API_URL is like http://localhost:5000/api or https://substanceai.cloud/api
+  // We need the base without /api, then append the path (which already starts with /api/uploads/...)
+  const baseUrl = config.API_URL.replace(/\/api\/?$/, '');
+  const fullUrl = `${baseUrl}${path.startsWith('/') ? path : '/' + path}`;
+  return fullUrl;
 };
 
 export const api = {
