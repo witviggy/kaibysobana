@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS fabrics (
     meters_per_outfit NUMERIC(10, 2) DEFAULT 0,
     price_per_meter NUMERIC(10, 2) DEFAULT 0,
     status VARCHAR(50) DEFAULT 'In Stock',
+    image_url TEXT,
+    is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -85,17 +87,6 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Generate sample products
-INSERT INTO products (id, name, default_fabric_id, base_price, description, fabric_required, stitching_cost) VALUES 
-(1, 'Summer Dress', 1, 1800.00, 'Light breathable summer dress.', 1.5, 500.00),
-(2, 'Linen Shirt', 4, 850.00, 'Casual linen shirt for everyday wear.', 1.2, 200.00),
-(3, 'Silk Blouse', 2, 1400.00, 'Elegant silk blouse.', 2.0, 400.00),
-(4, 'Tweed Jacket', 3, 2400.00, 'Warm and stylish tweed jacket.', 2.5, 800.00),
-(5, 'Casual Pant', 4, 3200.00, 'Comfortable linen blend pants.', 1.8, 1000.00),
-(6, 'Denim Skirt', 1, 1650.00, 'Classic blue denim skirt.', 1.0, 450.00);
-
-SELECT setval('products_id_seq', (SELECT MAX(id) FROM products));
-
 -- Create Notifications Table
 CREATE TABLE IF NOT EXISTS notifications (
     id SERIAL PRIMARY KEY,
@@ -104,6 +95,51 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_read BOOLEAN DEFAULT FALSE,
     is_archived BOOLEAN DEFAULT FALSE
+);
+
+-- Create Activity Logs Table
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INT,
+    action VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(50),
+    details JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create Order Items Table
+CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id VARCHAR(50) REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(id),
+    dress_name VARCHAR(255),
+    fabric_id INTEGER REFERENCES fabrics(id),
+    quantity INTEGER DEFAULT 1,
+    size_chart VARCHAR(10),
+    fabric_required NUMERIC(10, 2) DEFAULT 0,
+    fabric_cost NUMERIC(10, 2) DEFAULT 0,
+    stitching_cost NUMERIC(10, 2) DEFAULT 0,
+    profit_margin NUMERIC(10, 2) DEFAULT 0,
+    selling_price NUMERIC(10, 2) DEFAULT 0,
+    remarks TEXT
+);
+
+-- Create Events Table (Calendar)
+CREATE TABLE IF NOT EXISTS events (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    event_date TIMESTAMP NOT NULL,
+    type VARCHAR(50) DEFAULT 'reminder',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create App Settings Table
+CREATE TABLE IF NOT EXISTS app_settings (
+    id SERIAL PRIMARY KEY,
+    app_name VARCHAR(255) DEFAULT 'கை(kai)',
+    logo_url TEXT DEFAULT '/src/logo/kailogov1.png'
 );
 
 -- Seed Data (Dynamic Dates)
@@ -124,7 +160,7 @@ INSERT INTO clients (id, name, email, phone, address, status, member_since, last
 
 SELECT setval('clients_id_seq', (SELECT MAX(id) FROM clients));
 
--- Fabrics
+-- Fabrics (must be seeded before products due to FK constraint)
 INSERT INTO fabrics (id, name, color, meters_available, meters_per_outfit, price_per_meter, status) VALUES 
 (1, 'Cotton Denim', 'Navy Blue', 25.5, 1.5, 12.00, 'In Stock'),
 (2, 'Silk Charmeuse', 'Ivory', 5.0, 2.2, 45.00, 'Low Stock'),
@@ -133,6 +169,20 @@ INSERT INTO fabrics (id, name, color, meters_available, meters_per_outfit, price
 (5, 'Velvet', 'Burgundy', 1.5, 3.0, 55.00, 'Critical');
 
 SELECT setval('fabrics_id_seq', (SELECT MAX(id) FROM fabrics));
+
+-- Products (inserted after fabrics to satisfy FK)
+INSERT INTO products (id, name, default_fabric_id, base_price, description, fabric_required, stitching_cost) VALUES 
+(1, 'Summer Dress', 1, 1800.00, 'Light breathable summer dress.', 1.5, 500.00),
+(2, 'Linen Shirt', 4, 850.00, 'Casual linen shirt for everyday wear.', 1.2, 200.00),
+(3, 'Silk Blouse', 2, 1400.00, 'Elegant silk blouse.', 2.0, 400.00),
+(4, 'Tweed Jacket', 3, 2400.00, 'Warm and stylish tweed jacket.', 2.5, 800.00),
+(5, 'Casual Pant', 4, 3200.00, 'Comfortable linen blend pants.', 1.8, 1000.00),
+(6, 'Denim Skirt', 1, 1650.00, 'Classic blue denim skirt.', 1.0, 450.00);
+
+SELECT setval('products_id_seq', (SELECT MAX(id) FROM products));
+
+-- App Settings
+INSERT INTO app_settings (id, app_name, logo_url) VALUES (1, 'கை(kai)', '/src/logo/kailogov1.png');
 
 -- Orders (Dynamic Dates)
 INSERT INTO orders (id, client_id, fabric_id, quantity, order_date, delivery_date, status, dress_name, fabric_required, selling_price, stitching_cost, fabric_cost, courier_cost_from_me, courier_cost_to_me) VALUES 
