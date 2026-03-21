@@ -300,10 +300,18 @@ const Catalog: React.FC = () => {
                                     currentImageUrl={formData.imageUrl}
                                     onImageSelected={async (file) => {
                                         try {
-                                            const { url } = await api.uploadImage(file);
-                                            setFormData(prev => ({ ...prev, imageUrl: url }));
+                                            console.log('📸 Uploading image:', file.name);
+                                            const response = await api.uploadImage(file, 'products');
+                                            console.log('✅ Upload response:', response);
+                                            if (response.url) {
+                                                setFormData(prev => ({ ...prev, imageUrl: response.url }));
+                                                addToast('Image uploaded successfully', 'success');
+                                            } else {
+                                                addToast('Upload succeeded but no URL returned', 'error');
+                                            }
                                         } catch (e) {
-                                            console.error('Upload failed', e);
+                                            console.error('❌ Upload failed:', e);
+                                            addToast(`Image upload failed: ${e.message}`, 'error');
                                         }
                                     }}
                                 />

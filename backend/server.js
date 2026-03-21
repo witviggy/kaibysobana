@@ -599,6 +599,8 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
     const fileName = uniqueSuffix + path.extname(req.file.originalname);
     const storagePath = folder ? `${folder}/${fileName}` : fileName;
 
+    console.log(`📤 Upload request: ${req.file.originalname} -> ${storagePath}`);
+
     // Try Supabase first, fallback to local storage
     if (supabase) {
       // Upload to Supabase Storage
@@ -610,7 +612,7 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         });
 
       if (error) {
-        console.error('Supabase upload error:', error);
+        console.error('❌ Supabase upload error:', error);
         return res.status(500).json({ message: 'Upload to storage failed', error: error.message });
       }
 
@@ -619,6 +621,7 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         .from('images')
         .getPublicUrl(storagePath);
 
+      console.log('✅ Supabase upload complete:', urlData.publicUrl);
       return res.json({ url: urlData.publicUrl });
     } else {
       // Local file storage fallback
@@ -630,13 +633,14 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       const filePath = path.join(targetDir, fileName);
       fs.writeFileSync(filePath, req.file.buffer);
 
-      // Return URL relative to backend
-      const publicUrl = folder ? `${BACKEND_URL}/uploads/${folder}/${fileName}` : `${BACKEND_URL}/uploads/${fileName}`;
-      console.log('📁 File saved locally:', publicUrl);
-      return res.json({ url: publicUrl });
+      // Return RELATIVE URL - frontend will construct full URL based on current API_URL
+      const relativeUrl = folder ? `/uploads/${folder}/${fileName}` : `/uploads/${fileName}`;
+      console.log('✅ File saved locally:', relativeUrl);
+      console.log('   Physical path:', filePath);
+      return res.json({ url: relativeUrl });
     }
   } catch (err) {
-    console.error(err);
+    console.error('❌ Upload error:', err);
     res.status(500).json({ message: 'Upload failed', error: err.message });
   }
 });
@@ -1055,20 +1059,28 @@ app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        p.*, 
-        f.name as "defaultFabricName",
-        f.color as "defaultFabricColor",
+        p.id,
+        p.name,
+        p.default_fabric_id as "defaultFabricId",
+        p.base_price as "basePrice",
+        p.description,
+        p.image_url as "imageUrl",
         p.fabric_required as "fabricRequired",
         p.stitching_cost as "stitchingCost",
         p.price_per_size as "pricePerSize",
-        p.fabric_per_size as "fabricPerSize"
+        p.fabric_per_size as "fabricPerSize",
+        p.created_at as "createdAt",
+        p.updated_at as "updatedAt",
+        f.name as "defaultFabricName",
+        f.color as "defaultFabricColor"
       FROM products p 
       LEFT JOIN fabrics f ON p.default_fabric_id = f.id 
       ORDER BY p.name ASC
     `);
+    console.log('📦 Products fetched:', result.rows.length, 'items');
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error fetching products:', err);
     res.status(500).send('Server Error');
   }
 });
