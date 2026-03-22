@@ -392,8 +392,8 @@ const Login: React.FC = () => {
                     </form>
                 </div>
 
-                {/* Toggle link */}
-                <div style={{
+                {/* Toggle link - Sign up disabled */}
+                {/* <div style={{
                     textAlign: 'center',
                     marginTop: '20px',
                 }}>
@@ -420,7 +420,7 @@ const Login: React.FC = () => {
                             : <>Don&apos;t have an account? <span style={{ fontWeight: 600 }}>Sign up</span></>
                         }
                     </button>
-                </div>
+                </div> */}
 
                 {/* Footer */}
                 <p style={{

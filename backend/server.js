@@ -146,7 +146,8 @@ const migrateSchema = async () => {
       ADD COLUMN IF NOT EXISTS fabric_required NUMERIC(10, 2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS stitching_cost NUMERIC(10, 2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS price_per_size JSONB DEFAULT '{}',
-      ADD COLUMN IF NOT EXISTS fabric_per_size JSONB DEFAULT '{}';
+      ADD COLUMN IF NOT EXISTS fabric_per_size JSONB DEFAULT '{}',
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
   `, "Alter Products Table");
 
   // 6. Order Items (Multi-Dress Support)
@@ -1083,7 +1084,6 @@ app.get('/api/products', async (req, res) => {
         p.price_per_size as "pricePerSize",
         p.fabric_per_size as "fabricPerSize",
         p.created_at as "createdAt",
-        p.updated_at as "updatedAt",
         f.name as "defaultFabricName",
         f.color as "defaultFabricColor"
       FROM products p 

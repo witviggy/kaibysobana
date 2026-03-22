@@ -170,6 +170,27 @@ const NewClientOrder: React.FC = () => {
 
     const handleClientInfoChange = (field: string, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        if (field === 'clientName') {
+            setShowClientSuggestions(true);
+        }
+    };
+
+    // Client name autosuggest
+    const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+    const filteredClients = formData.clientName.trim().length > 0
+        ? clients.filter(c => c.name.toLowerCase().startsWith(formData.clientName.trim().toLowerCase()))
+        : [];
+
+    const selectClient = (client: any) => {
+        setFormData(prev => ({
+            ...prev,
+            clientName: client.name,
+            clientPhone: client.phone || '',
+            clientEmail: client.email || '',
+            clientAddress: client.address || '',
+            clientId: client.id
+        }));
+        setShowClientSuggestions(false);
     };
 
     const handleAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -453,7 +474,7 @@ const NewClientOrder: React.FC = () => {
                             <User size={16} className="text-zinc-500" /> Customer
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
+                            <div className="relative">
                                 <label className="text-sm font-medium text-zinc-700 block mb-1">Client Name</label>
                                 <input
                                     required
@@ -461,7 +482,25 @@ const NewClientOrder: React.FC = () => {
                                     className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm"
                                     value={formData.clientName}
                                     onChange={e => handleClientInfoChange('clientName', e.target.value)}
+                                    onFocus={() => setShowClientSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowClientSuggestions(false), 200)}
+                                    autoComplete="off"
                                 />
+                                {showClientSuggestions && filteredClients.length > 0 && (
+                                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        {filteredClients.map(client => (
+                                            <button
+                                                key={client.id}
+                                                type="button"
+                                                className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 border-b border-zinc-100 last:border-0 flex items-center justify-between"
+                                                onMouseDown={() => selectClient(client)}
+                                            >
+                                                <span className="font-medium text-zinc-900">{client.name}</span>
+                                                <span className="text-xs text-zinc-400">{client.phone}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-zinc-700 block mb-1">Phone</label>
@@ -525,7 +564,7 @@ const NewClientOrder: React.FC = () => {
                                         <CustomSelect
                                             value={item.fabricId}
                                             onChange={val => handleItemChange(index, 'fabricId', val)}
-                                            options={fabrics.map(f => ({ value: f.id, label: `${f.name} (${f.color})` }))}
+                                            options={fabrics.map(f => ({ value: String(f.id), label: `${f.name} (${f.color})` }))}
                                             placeholder="Select Fabric"
                                         />
                                     </div>

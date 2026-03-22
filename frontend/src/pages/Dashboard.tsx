@@ -460,7 +460,12 @@ const Dashboard: React.FC = () => {
                       cursor={{ fill: '#f4f4f5' }}
                       formatter={(value: number) => [`${value} units`, 'Used']}
                     />
-                    <Bar dataKey="amount" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} name="Used" />
+                    <Bar dataKey="amount" radius={[0, 4, 4, 0]} barSize={24} name="Used">
+                      {fabricUsageData.map((_: any, index: number) => {
+                        const FABRIC_COLORS = ['#f97316', '#0ea5e9', '#8b5cf6', '#10b981', '#ec4899', '#eab308', '#6366f1', '#14b8a6'];
+                        return <Cell key={`fab-${index}`} fill={FABRIC_COLORS[index % FABRIC_COLORS.length]} />;
+                      })}
+                    </Bar>
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
